@@ -866,29 +866,29 @@ function generateRoomCode() {
   if (peer) { peer.destroy(); peer = null; }
 
   peer = new Peer({
-  config: {
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
+    config: {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
 
-      {
-        urls: 'turn:openrelay.metered.ca:80',
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
-      },
-      {
-        urls: 'turn:openrelay.metered.ca:443',
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
-      },
-      {
-        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
-      }
-    ]
-  }
-});
+        {
+          urls: 'turn:openrelay.metered.ca:80',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        }
+      ]
+    }
+  });
 
   peer.on('open', id => {
     isHost = true;
@@ -922,7 +922,7 @@ function connectToRoom() {
   document.getElementById('connStatus').textContent = 'Connecting...';
 
   const doConnect = () => {
-    const conn = peer.connect(code, { reliable: true, serialization: 'json' });
+    const conn = peer.connect(code, { reliable: true, serialization: 'json', metadata: { initiator: true } });
     dc = conn;
     setupDataChannel(conn);
     conn.on('error', err => {
@@ -934,33 +934,42 @@ function connectToRoom() {
 
   if (!peer) {
     peer = new Peer({
-  config: {
-    iceServers: [
-      { urls: 'stun:stun.l.google.com:19302' },
-      { urls: 'stun:stun1.l.google.com:19302' },
+      config: {
+        iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
 
-      {
-        urls: 'turn:openrelay.metered.ca:80',
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
-      },
-      {
-        urls: 'turn:openrelay.metered.ca:443',
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
-      },
-      {
-        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
+        {
+          urls: 'turn:openrelay.metered.ca:80',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        },
+        {
+          urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+          username: 'openrelayproject',
+          credential: 'openrelayproject'
+        }
+      ]
       }
-    ]
-  }
-});
+    });
     peer.on('open', id => { myPeerId = id; doConnect(); });
     peer.on('error', err => {
+      console.error('Peer error:', err);
       document.getElementById('connStatus').textContent = 'Error: ' + err.message;
       document.getElementById('connectBtn').disabled = false;
+    });
+
+    peer.on('disconnected', () => {
+      console.log('Peer disconnected');
+    });
+
+    peer.on('close', () => {
+      console.log('Peer closed');
     });
   } else if (peer.open) {
     doConnect();
@@ -1016,14 +1025,16 @@ function scheduleReconnect() {
     if (!isHost && opponentPeerId) {
       // Non-host knows the host peer ID — reconnect directly
       try {
-        const conn = peer.connect(opponentPeerId, { reliable: true, serialization: 'json' });
+        const conn = peer.connect(opponentPeerId, { reliable: true, serialization: 'json', metadata: { initiator: true } });
         dc = conn;
         setupDataChannel(conn);
         conn.on('error', () => scheduleReconnect());
       } catch(e) { scheduleReconnect(); }
     } else if (isHost) {
       // Host re-arms the incoming connection listener so opponent can reconnect
-      peer.off('connection');
+      if (peer.removeAllListeners) {
+        peer.removeAllListeners('connection');
+      }
       peer.on('connection', conn => { dc = conn; setupDataChannel(conn); });
       toast.textContent = '\u27F3 Waiting for opponent to reconnect\u2026';
       clearTimeout(_reconnectTimer);
