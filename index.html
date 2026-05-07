@@ -186,7 +186,7 @@ html,body { height:100%; overflow:hidden; background:#060f0a; font-family:'Spect
 
 /* Opponent zone */
 .player-zone {
-  width:100%; display:flex; flex-direction:column; align-items:center; gap:8px;
+  width:100%; display:flex; flex-direction:column; align-items:center; gap:10px;
   z-index:1;
 }
 .player-label {
@@ -194,16 +194,16 @@ html,body { height:100%; overflow:hidden; background:#060f0a; font-family:'Spect
   color:var(--text-dim);
 }
 .player-info {
-  display:flex; align-items:center; gap:12px;
-  background:rgba(0,0,0,0.35); border:1px solid var(--panel-border);
-  border-radius:24px; padding:6px 16px;
+  display:flex; align-items:center; gap:14px;
+  background:rgba(0,0,0,0.45); border:1px solid var(--panel-border);
+  border-radius:32px; padding:8px 20px;
 }
-.player-name { font-size:0.85rem; color:var(--cream); font-weight:500; }
-.player-chips { font-size:0.75rem; color:var(--gold-dim); }
+.player-name { font-size:1.05rem; color:var(--cream); font-weight:600; letter-spacing:0.02em; }
+.player-chips { font-size:1rem; color:var(--gold-light); font-weight:600; font-family:'Playfair Display',serif; }
 .player-bet-badge {
   background:rgba(201,168,76,0.15); border:1px solid var(--gold-dim);
-  border-radius:12px; padding:2px 10px;
-  font-size:0.72rem; color:var(--gold); display:none;
+  border-radius:12px; padding:3px 12px;
+  font-size:0.82rem; color:var(--gold); display:none;
 }
 
 /* Cards */
@@ -445,7 +445,9 @@ html,body { height:100%; overflow:hidden; background:#060f0a; font-family:'Spect
   #actionBtns { gap: 5px; }
   .action-btn { padding: 7px 12px; font-size: 0.75rem; }
   .raise-input { width: 70px; padding: 5px 8px; font-size: 0.8rem; }
-  .player-info { padding: 4px 10px; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .player-info { padding: 6px 14px; gap: 10px; flex-wrap: wrap; justify-content: center; }
+  .player-name { font-size: 0.92rem; }
+  .player-chips { font-size: 0.88rem; }
 
   /* Side panel becomes full-width below table */
   #sidePanel { border-left: none; border-top: 1px solid var(--panel-border); height: auto; min-height: 0; }
@@ -515,7 +517,7 @@ html,body { height:100%; overflow:hidden; background:#060f0a; font-family:'Spect
         <option value="none">No API — Negotiate stakes with opponent</option>
       </select>
       <div id="apiKeyRow">
-        <div class="o-label" id="apiKeyLabel">API Key (AI Interfacing may not work)</div>
+        <div class="o-label" id="apiKeyLabel">API Key (leave blank in Claude.ai)</div>
         <input type="password" class="o-input" id="apiKeyInput" placeholder="Leave blank if running in Claude.ai">
       </div>
       <div id="customEndpointRow" style="display:none;margin-top:8px">
@@ -594,7 +596,7 @@ html,body { height:100%; overflow:hidden; background:#060f0a; font-family:'Spect
       <!-- Opponent -->
       <div class="player-zone" id="opponentZone" style="position:relative">
         <div class="player-info">
-          <div id="tableOppAvatar" style="width:28px;height:28px;border-radius:50%;background:var(--felt-dark);border:1px solid var(--panel-border);display:flex;align-items:center;justify-content:center;font-size:0.8rem;overflow:hidden;flex-shrink:0"><span>&#128100;</span></div>
+          <div id="tableOppAvatar" style="width:48px;height:48px;border-radius:50%;background:var(--felt-dark);border:2px solid var(--panel-border);display:flex;align-items:center;justify-content:center;font-size:1.3rem;overflow:hidden;flex-shrink:0"><span>&#128100;</span></div>
           <span class="player-name" id="opponentName">Opponent</span>
           <span class="player-chips">&#127920; <span id="opponentChips">500</span></span>
           <div class="player-bet-badge" id="opponentBetBadge">Bet: 0</div>
@@ -630,7 +632,7 @@ html,body { height:100%; overflow:hidden; background:#060f0a; font-family:'Spect
         <div id="mySpeechBubbleZone" style="min-height:0"></div>
         <div class="hand-cards" id="playerCards"></div>
         <div class="player-info">
-          <div id="tableMyAvatar" style="width:28px;height:28px;border-radius:50%;background:var(--felt-dark);border:2px solid var(--gold-dim);display:flex;align-items:center;justify-content:center;font-size:0.8rem;overflow:hidden;flex-shrink:0"><span>&#127956;</span></div>
+          <div id="tableMyAvatar" style="width:48px;height:48px;border-radius:50%;background:var(--felt-dark);border:2px solid var(--gold-dim);display:flex;align-items:center;justify-content:center;font-size:1.3rem;overflow:hidden;flex-shrink:0"><span>&#127956;</span></div>
           <span class="player-name" id="playerName">You</span>
           <span class="player-chips">&#127920; <span id="playerChips">500</span></span>
           <div class="player-bet-badge" id="playerBetBadge">Bet: 0</div>
@@ -736,41 +738,57 @@ html,body { height:100%; overflow:hidden; background:#060f0a; font-family:'Spect
       <div class="tab-content" id="tab-log">
         <div id="profileSection" style="background:#0a1e10;border:1px solid var(--panel-border);border-radius:4px;padding:12px;margin-bottom:12px">
           <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
-            <div id="myAvatarPreview" style="width:44px;height:44px;border-radius:50%;background:var(--felt);border:2px solid var(--gold-dim);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;overflow:hidden;cursor:pointer" onclick="document.getElementById('avatarUpload').click()" title="Click to change avatar">
+            <div id="myAvatarPreview" style="width:64px;height:64px;border-radius:50%;background:var(--felt);border:2px solid var(--gold-dim);display:flex;align-items:center;justify-content:center;font-size:1.6rem;flex-shrink:0;overflow:hidden;cursor:pointer" onclick="document.getElementById('avatarUpload').click()" title="Click to change avatar">
               <span id="myAvatarEmoji">&#127956;</span>
               <img id="myAvatarImg" style="display:none;width:100%;height:100%;object-fit:cover">
             </div>
             <div style="flex:1;min-width:0">
               <div style="display:flex;align-items:center;gap:6px">
-                <input type="text" id="myDisplayName" value="" placeholder="Your name" style="background:transparent;border:none;border-bottom:1px solid var(--panel-border);color:var(--cream);font-family:'Spectral',serif;font-size:0.88rem;outline:none;flex:1;min-width:0" oninput="broadcastProfile()">
+                <input type="text" id="myDisplayName" value="" placeholder="Your name" style="background:transparent;border:none;border-bottom:1px solid var(--panel-border);color:var(--cream);font-family:'Spectral',serif;font-size:1.05rem;outline:none;flex:1;min-width:0;font-weight:600" oninput="broadcastProfile()">
                 <span style="font-size:0.6rem;color:var(--gold-dim);cursor:pointer" onclick="document.getElementById('avatarUpload').click()">&#9998; pic</span>
               </div>
               <div style="font-size:0.65rem;color:var(--text-dim);margin-top:2px">Click name or pic to edit</div>
             </div>
           </div>
           <div style="display:flex;align-items:center;gap:8px;font-size:0.7rem;color:var(--text-dim)">
-            <div id="opponentAvatarPreview" style="width:28px;height:28px;border-radius:50%;background:var(--felt-dark);border:1px solid var(--panel-border);display:flex;align-items:center;justify-content:center;font-size:0.8rem;overflow:hidden;flex-shrink:0">
+            <div id="opponentAvatarPreview" style="width:40px;height:40px;border-radius:50%;background:var(--felt-dark);border:1px solid var(--panel-border);display:flex;align-items:center;justify-content:center;font-size:1.1rem;overflow:hidden;flex-shrink:0">
               <span id="oppAvatarEmoji">&#128100;</span>
               <img id="oppAvatarImg" style="display:none;width:100%;height:100%;object-fit:cover">
             </div>
-            <span id="opponentChatName" style="color:var(--cream-dim)">Opponent</span>
+            <span id="opponentChatName" style="color:var(--cream-dim);font-size:0.95rem;font-weight:600">Opponent</span>
             <span style="margin-left:auto;font-size:0.6rem;color:var(--gold-dim)">&#128274; E2E encrypted</span>
           </div>
           <input type="file" id="avatarUpload" accept="image/*" style="display:none" onchange="handleAvatarUpload(event)">
         </div>
         <div id="chatMessages" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;max-height:300px;overflow-y:auto;padding-right:2px"></div>
-        <div style="background:#0a1e10;border:1px solid var(--panel-border);border-radius:4px;padding:10px">
+        <div style="background:#0a1e10;border:1px solid var(--panel-border);border-radius:4px;padding:10px;position:relative">
           <textarea id="chatInput" placeholder="Type a message..." style="width:100%;background:transparent;border:none;color:var(--cream);font-family:'Spectral',serif;font-size:0.83rem;resize:none;outline:none;height:52px;line-height:1.4" onkeydown="chatKeydown(event)"></textarea>
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">
-            <label style="cursor:pointer;color:var(--gold-dim);font-size:0.75rem;display:flex;align-items:center;gap:4px">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px;gap:6px">
+            <label style="cursor:pointer;color:var(--gold-dim);font-size:0.75rem;display:flex;align-items:center;gap:4px;flex-shrink:0" title="Attach image, GIF or video (up to 80MB)">
               &#128206; <span style="font-size:0.7rem">Attach</span>
-              <input type="file" id="chatImageUpload" accept="image/*" style="display:none" onchange="handleChatImageUpload(event)">
+              <input type="file" id="chatMediaUpload" accept="image/*,image/gif,video/mp4,video/webm,video/quicktime,video/x-msvideo,video/*" style="display:none" onchange="handleChatMediaUpload(event)">
             </label>
-            <button class="btn btn-gold" onclick="sendChatMessage()" style="padding:5px 14px;font-size:0.78rem">Send &#8629;</button>
+            <button onclick="openGiphyPicker()" style="background:transparent;border:1px solid var(--panel-border);color:var(--gold-dim);border-radius:3px;padding:4px 9px;font-family:'Spectral',serif;font-size:0.72rem;cursor:pointer;flex-shrink:0" title="Send a GIF">GIF ✦</button>
+            <button class="btn btn-gold" onclick="sendChatMessage()" style="padding:5px 14px;font-size:0.78rem;margin-left:auto">Send &#8629;</button>
           </div>
-          <div id="chatImagePreview" style="display:none;margin-top:6px;position:relative">
-            <img id="chatImgThumb" style="max-height:60px;border-radius:3px;border:1px solid var(--gold-dim)">
-            <button onclick="clearChatImage()" style="position:absolute;top:-4px;right:-4px;background:#c0392b;border:none;color:white;border-radius:50%;width:16px;height:16px;font-size:0.6rem;cursor:pointer;line-height:1">X</button>
+          <!-- Giphy picker popover -->
+          <div id="giphyPicker" style="display:none;position:absolute;bottom:100%;right:0;width:300px;background:var(--panel-bg);border:1px solid var(--gold-dim);border-radius:6px;padding:10px;z-index:50;box-shadow:0 -8px 32px rgba(0,0,0,0.6)">
+            <div style="display:flex;gap:6px;margin-bottom:8px">
+              <input id="giphySearch" type="text" placeholder="Search GIFs…" style="flex:1;background:#0a1e10;border:1px solid var(--panel-border);border-radius:3px;padding:6px 10px;color:var(--cream);font-family:'Spectral',serif;font-size:0.8rem;outline:none" onkeydown="giphyKeydown(event)">
+              <button onclick="searchGiphy()" style="background:var(--gold-dim);border:none;border-radius:3px;color:#0a1e10;padding:0 10px;cursor:pointer;font-size:0.8rem;font-weight:700">Go</button>
+              <button onclick="closeGiphyPicker()" style="background:transparent;border:1px solid var(--panel-border);border-radius:3px;color:var(--text-dim);padding:0 8px;cursor:pointer;font-size:0.85rem">✕</button>
+            </div>
+            <div id="giphyResults" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;max-height:220px;overflow-y:auto"></div>
+            <div id="giphyStatus" style="font-size:0.7rem;color:var(--text-dim);text-align:center;margin-top:6px;min-height:14px"></div>
+          </div>
+          <div id="chatMediaPreview" style="display:none;margin-top:8px;position:relative;background:#040d07;border:1px solid var(--panel-border);border-radius:4px;padding:6px;display:none;align-items:center;gap:8px">
+            <img id="chatImgThumb" style="max-height:56px;max-width:80px;border-radius:3px;object-fit:cover;display:none">
+            <video id="chatVidThumb" style="max-height:56px;max-width:80px;border-radius:3px;object-fit:cover;display:none" muted playsinline></video>
+            <div style="flex:1;min-width:0">
+              <div id="chatMediaName" style="font-size:0.72rem;color:var(--cream);white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+              <div id="chatMediaSize" style="font-size:0.65rem;color:var(--text-dim);margin-top:2px"></div>
+            </div>
+            <button onclick="clearChatMedia()" style="flex-shrink:0;background:#c0392b;border:none;color:white;border-radius:50%;width:18px;height:18px;font-size:0.65rem;cursor:pointer;line-height:1">✕</button>
           </div>
         </div>
         <div id="gameLog" style="margin-top:10px;font-size:0.7rem;color:var(--text-dim);max-height:80px;overflow-y:auto"></div>
@@ -1000,9 +1018,11 @@ function handleMessage(msg) {
       receiveNegotiationCounter(msg);
       break;
     case 'stake_neg_accept': {
-      const agreedCoins = negotiation.myOffer;
+      // The receiver accepted — msg contains the agreed coins and proposerPeerId
+      const agreedCoins = msg.coins !== undefined ? msg.coins : (negotiation.myOffer || negotiation.theirOffer);
       const agreedDesc = negotiation.desc;
-      finaliseNegotiatedStake(agreedDesc, agreedCoins);
+      const proposerPeerId = msg.proposerPeerId || negotiation.proposerPeerId || (myPeerId || 'me');
+      finaliseNegotiatedStake(agreedDesc, agreedCoins, proposerPeerId);
       addLog('Stake agreed: "' + agreedDesc + '" for ' + agreedCoins + ' coins', 'log-win');
       closeNegotiation();
       break;
@@ -1013,6 +1033,9 @@ function handleMessage(msg) {
       break;
     case 'chat_msg':
       receiveChat(msg);
+      break;
+    case 'chat_gif':
+      receiveChatGif(msg);
       break;
     case 'chat_img_chunk':
       receiveChatChunk(msg);
@@ -1025,6 +1048,16 @@ function handleMessage(msg) {
       break;
   }
 }
+
+// Close giphy picker when clicking outside
+document.addEventListener('click', function(e) {
+  const picker = document.getElementById('giphyPicker');
+  if (!picker) return;
+  if (picker.style.display === 'none') return;
+  if (!picker.contains(e.target) && !e.target.closest('[onclick*="openGiphyPicker"]') && e.target.textContent.trim() !== 'GIF ✦') {
+    picker.style.display = 'none';
+  }
+}, true);
 
 function showOverlay() {
   if (peer) { peer.destroy(); peer = null; dc = null; }
@@ -1601,7 +1634,7 @@ function resetGameVisuals() {
 // STAKES NEGOTIATION SYSTEM
 // ===================================================
 let pendingNegDesc = '';
-let negotiation = { active: false, id: null, desc: '', myOffer: 0, theirOffer: 0, round: 0, iAmProposer: false };
+let negotiation = { active: false, id: null, desc: '', myOffer: 0, theirOffer: 0, round: 0, iAmProposer: false, proposerPeerId: null };
 let negIdCounter = 0;
 
 function openNegotiationAsProposer(desc, defaultCoins) {
@@ -1630,9 +1663,10 @@ function proposeStakeToOpponent() {
   if (!desc) return;
 
   const id = ++negIdCounter;
-  negotiation = { active: true, id, desc, myOffer: coins, theirOffer: 0, round: 1, iAmProposer: true };
+  const proposerPeerId = myPeerId || 'me';
+  negotiation = { active: true, id, desc, myOffer: coins, theirOffer: 0, round: 1, iAmProposer: true, proposerPeerId };
 
-  send({ type: 'stake_negotiate', negotiationId: id, desc, coins, round: 1 });
+  send({ type: 'stake_negotiate', negotiationId: id, desc, coins, round: 1, proposerPeerId });
   addLog('Proposed stake: "' + desc + '" for ' + coins + ' coins', 'log-system');
 
   // Update panel to waiting state
@@ -1643,8 +1677,8 @@ function proposeStakeToOpponent() {
 }
 
 function receiveNegotiationProposal(msg) {
-  // We are the receiver of a proposal
-  negotiation = { active: true, id: msg.negotiationId, desc: msg.desc, myOffer: 0, theirOffer: msg.coins, round: msg.round, iAmProposer: false };
+  // We are the receiver of a proposal — store the proposer's peerId so we can tag the stake correctly
+  negotiation = { active: true, id: msg.negotiationId, desc: msg.desc, myOffer: 0, theirOffer: msg.coins, round: msg.round, iAmProposer: false, proposerPeerId: msg.proposerPeerId || opponentPeerId };
 
   document.getElementById('negotiationPanel').style.display = 'block';
   document.getElementById('negDesc').textContent = '"' + msg.desc + '"';
@@ -1703,13 +1737,16 @@ function negSliderUpdate() {
 
 function negAccept() {
   if (!negotiation.active) return;
+  // Receiver accepts: the agreed amount is whatever the proposer last offered (theirOffer),
+  // or if we're the proposer accepting a counter, it's the counter (theirOffer).
   const agreedCoins = negotiation.theirOffer || negotiation.myOffer;
   const desc = negotiation.desc;
+  const proposerPeerId = negotiation.proposerPeerId;
 
-  send({ type: 'stake_neg_accept', negotiationId: negotiation.id });
+  send({ type: 'stake_neg_accept', negotiationId: negotiation.id, coins: agreedCoins, proposerPeerId });
 
-  // Both add the stake
-  finaliseNegotiatedStake(desc, agreedCoins);
+  // Finalise stake — tagged with proposer's peerId so it appears in the right column for both players
+  finaliseNegotiatedStake(desc, agreedCoins, proposerPeerId);
   addLog('Stake agreed: "' + desc + '" for ' + agreedCoins + ' coins', 'log-win');
   closeNegotiation();
 }
@@ -1751,17 +1788,23 @@ function negDecline() {
   document.getElementById('stakeInput').value = '';
 }
 
-function finaliseNegotiatedStake(desc, coins) {
-  const stake = { id: ++stakeIdCounter, description: desc, coins, createdBy: myPeerId || 'me' };
+function finaliseNegotiatedStake(desc, coins, proposerPeerId) {
+  // The stake always belongs to whoever proposed it — so both players store it under the proposer's peerId.
+  // This means: proposer sees it in "Your Stakes", receiver sees it in "Opponent's Stakes".
+  const createdBy = proposerPeerId || myPeerId || 'me';
+  const stake = { id: ++stakeIdCounter, description: desc, coins, createdBy };
   allStakes.push(stake);
-  gameState.myChips += coins;
+  // Chips are added to the proposer's stack — if I am the proposer, add to my chips; otherwise the host's chips update is reflected when they finalise
+  if (createdBy === (myPeerId || 'me')) {
+    gameState.myChips += coins;
+  }
   renderTable();
   renderStakes();
-  addLog('&#10022; Stake agreed: +' + coins + ' chips added to your stack', 'log-win');
+  addLog('&#10022; Stake agreed: "' + desc + '" — ' + coins + ' chips added to proposer\'s stack', 'log-win');
 }
 
 function closeNegotiation() {
-  negotiation = { active: false, id: null, desc: '', myOffer: 0, theirOffer: 0, round: 0, iAmProposer: false };
+  negotiation = { active: false, id: null, desc: '', myOffer: 0, theirOffer: 0, round: 0, iAmProposer: false, proposerPeerId: null };
   document.getElementById('negotiationPanel').style.display = 'none';
   document.getElementById('stakeInput').value = '';
   document.getElementById('stakeCoinsPreview').textContent = '— coins';
@@ -1840,52 +1883,32 @@ async function evaluateStake() {
   const desc = document.getElementById('stakeInput').value.trim();
   if (!desc) return;
 
+  // Stakes always go through negotiation with the opponent — AI/heuristic only suggests a starting coin value.
+  // This applies equally to host and non-host; neither side can unilaterally add a stake.
+
   const provider = document.getElementById('providerSelect')?.value || 'anthropic';
-
-  // No-API path: open negotiation flow
-  if (provider === 'none') {
-    pendingCoins = 50;
-    pendingNegDesc = desc;
-    document.getElementById('evalStatus').textContent = 'Set a coin value and propose to your opponent';
-    document.getElementById('stakeCoinsPreview').textContent = '50 coins';
-    document.getElementById('submitStakeBtn').disabled = false;
-    document.getElementById('submitStakeBtn').textContent = '⟡ Propose';
-    document.getElementById('submitStakeBtn').onclick = proposeStakeToOpponent;
-    // Show a quick inline slider
-    openNegotiationAsProposer(desc, 50);
-    return;
-  }
-
-  // Reset button state
-  document.getElementById('submitStakeBtn').textContent = 'Submit';
-  document.getElementById('submitStakeBtn').onclick = submitStake;
 
   document.getElementById('evalBtn').disabled = true;
   document.getElementById('evalStatus').textContent = 'Evaluating...';
   document.getElementById('evalStatus').className = 'llm-thinking';
   document.getElementById('stakeCoinsPreview').textContent = '...';
 
+  let suggestedCoins = 50;
   try {
-    const coins = await callLLMForStake(desc);
-    pendingCoins = coins;
-    document.getElementById('stakeCoinsPreview').textContent = coins + ' coins';
-    document.getElementById('evalStatus').textContent = 'Evaluation complete — submit to add to shop';
-    document.getElementById('evalStatus').className = '';
-    document.getElementById('submitStakeBtn').disabled = false;
+    suggestedCoins = await callLLMForStake(desc);
   } catch (e) {
-    // If API fails, fall back to heuristic then offer negotiation
-    if (e.message === 'no_api') {
-      document.getElementById('evalStatus').textContent = 'No provider — negotiate with opponent';
-    } else {
-      const coins = heuristicEvaluate(desc);
-      pendingCoins = coins;
-      document.getElementById('stakeCoinsPreview').textContent = coins + ' coins (estimated)';
-      document.getElementById('evalStatus').textContent = 'API unavailable — used heuristic estimate';
-      document.getElementById('submitStakeBtn').disabled = false;
-    }
-    document.getElementById('evalStatus').className = '';
+    suggestedCoins = heuristicEvaluate(desc);
   }
+
   document.getElementById('evalBtn').disabled = false;
+  document.getElementById('evalStatus').textContent = '';
+  document.getElementById('evalStatus').className = '';
+
+  // Always open the negotiation proposer panel — coin value is just a suggested starting point
+  pendingCoins = suggestedCoins;
+  pendingNegDesc = desc;
+  document.getElementById('stakeCoinsPreview').textContent = suggestedCoins + ' coins';
+  openNegotiationAsProposer(desc, suggestedCoins);
 }
 
 async function callLLMForStake(description) {
@@ -2073,8 +2096,8 @@ function updateCoinsDisplay() {
 let chatEncKey = null;
 let myECDHPublic = null;
 let myECDHPrivate = null;
-let pendingChatImage = null; // compressed base64 data URL
-let myAvatar = null;          // base64 data URL for my profile pic
+let pendingChatMedia = null; // { dataUrl, type:'image'|'gif'|'video', name } or null
+let myAvatar = null;         // base64 data URL for my profile pic
 // Reassemble inbound image chunks: { [msgId]: { chunks:[], total, text } }
 const _imgChunks = {};
 const _pendingChunkBuffer = {}; // buffer chunks that arrive before their header
@@ -2126,37 +2149,49 @@ const CHUNK_SIZE = 12000;
 async function sendChatMessage() {
   const input = document.getElementById('chatInput');
   const text = input.value.trim();
-  if (!text && !pendingChatImage) return;
+  if (!text && !pendingChatMedia) return;
 
   const senderName = myName;
-  const imageToSend = pendingChatImage;
+  const mediaToSend = pendingChatMedia; // { dataUrl, type, name } or null
 
-  // Show own bubble immediately (local only)
-  appendChatBubble({ text, image: imageToSend, name: senderName, avatar: myAvatar, isMe: true });
+  const isVideo = mediaToSend && mediaToSend.type === 'video';
+  const isGifFile = mediaToSend && mediaToSend.type === 'gif';
 
-  // Send text header (encrypted) — do NOT include avatar (too large for PeerJS)
+  // Show own bubble immediately
+  if (isVideo) {
+    appendChatBubble({ text, video: mediaToSend.dataUrl, name: senderName, avatar: myAvatar, isMe: true });
+    showTableBubble('mySpeechBubbleZone', text || '🎬 Video', false, true);
+  } else if (isGifFile) {
+    appendChatBubble({ text, image: mediaToSend.dataUrl, name: senderName, avatar: myAvatar, isMe: true });
+    showTableBubble('mySpeechBubbleZone', text || '🎞 GIF', false, true);
+  } else if (mediaToSend) {
+    appendChatBubble({ text, image: mediaToSend.dataUrl, name: senderName, avatar: myAvatar, isMe: true });
+    showTableBubble('mySpeechBubbleZone', text || '📷 Image', false, true);
+  } else {
+    appendChatBubble({ text, name: senderName, avatar: myAvatar, isMe: true });
+    showTableBubble('mySpeechBubbleZone', text, false, true);
+  }
+
   const msgId = Date.now() + '_' + Math.random().toString(36).slice(2);
   const encText = await encryptText(text || '');
-  const hasImage = !!imageToSend;
+  const hasMedia = !!mediaToSend;
+  const mediaType = mediaToSend ? mediaToSend.type : null; // 'image'|'gif'|'video'
 
-  send({ type: 'chat_msg', msgId, encText, hasImage, senderName });
+  send({ type: 'chat_msg', msgId, encText, hasImage: hasMedia, mediaType, senderName });
 
-  // Send image chunks after a brief delay so header arrives first
-  if (imageToSend) {
-    const imgData = imageToSend;
-    const totalChunks = Math.ceil(imgData.length / CHUNK_SIZE);
-    // Small delay to ensure chat_msg header arrives before chunks
+  if (mediaToSend) {
+    const data = mediaToSend.dataUrl;
+    const totalChunks = Math.ceil(data.length / CHUNK_SIZE);
     await new Promise(r => setTimeout(r, 60));
     for (let i = 0; i < totalChunks; i++) {
-      const chunk = imgData.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-      send({ type: 'chat_img_chunk', msgId, chunk, index: i, total: totalChunks });
-      // Yield between chunks to avoid flooding PeerJS buffer
+      const chunk = data.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+      send({ type: 'chat_img_chunk', msgId, chunk, index: i, total: totalChunks, mediaType });
       if (i % 5 === 4) await new Promise(r => setTimeout(r, 20));
     }
   }
 
   input.value = '';
-  clearChatImage();
+  clearChatMedia();
 }
 
 function chatKeydown(e) {
@@ -2173,21 +2208,18 @@ async function receiveChat(msg) {
   }
 
   if (!msg.hasImage) {
-    // No image — show immediately
     appendChatBubble({ text, image: null, name: opponentNameStr, avatar: _lastOppAvatar, isMe: false });
-    // Show speech bubble on table near opponent
     showTableBubble('oppSpeechBubbleZone', text || '', false, false);
   } else {
-    // Reserve a bubble slot; image chunks will fill it in
-    _imgChunks[msg.msgId] = { chunks: [], total: null, text, name: opponentNameStr,
-      avatar: _lastOppAvatar, bubble: null };
-    // Append placeholder bubble now
-    const bubble = appendChatBubble({ text, image: null, name: opponentNameStr,
-      avatar: _lastOppAvatar, isMe: false, reserveId: msg.msgId });
+    const mediaType = msg.mediaType || 'image';
+    const tableLabel = mediaType === 'video' ? '🎬 Video' : (mediaType === 'gif' ? '🎞 GIF' : '📷 Image');
+    // Reserve a bubble slot — show loading placeholder
+    _imgChunks[msg.msgId] = { chunks: [], total: null, text, mediaType,
+      name: opponentNameStr, avatar: _lastOppAvatar, bubble: null };
+    const bubble = appendChatBubble({ text, mediaType, mediaLoading: true,
+      name: opponentNameStr, avatar: _lastOppAvatar, isMe: false, reserveId: msg.msgId });
     _imgChunks[msg.msgId].bubble = bubble;
-    // Show image speech bubble on table
-    showTableBubble('oppSpeechBubbleZone', text || '', true, false);
-    // Drain any chunks that arrived before this header
+    showTableBubble('oppSpeechBubbleZone', text || tableLabel, false, false);
     if (_pendingChunkBuffer[msg.msgId]) {
       _pendingChunkBuffer[msg.msgId].forEach(c => _applyChunk(c));
       delete _pendingChunkBuffer[msg.msgId];
@@ -2215,23 +2247,45 @@ function receiveChatChunk(msg) {
 function _applyChunk(msg) {
   const rec = _imgChunks[msg.msgId];
   if (!rec) return;
+  if (!rec.mediaType && msg.mediaType) rec.mediaType = msg.mediaType;
   rec.chunks[msg.index] = msg.chunk;
   if (rec.total === null) rec.total = msg.total;
+  // Update progress indicator
+  if (rec.bubble) {
+    const prog = rec.bubble.querySelector('.media-progress');
+    if (prog && rec.total > 1) {
+      const got = rec.chunks.filter(Boolean).length;
+      prog.textContent = Math.round(got / rec.total * 100) + '%';
+    }
+  }
   // Check if all chunks received
   let allGot = rec.total !== null;
   for (let i = 0; i < rec.total; i++) {
     if (!rec.chunks[i]) { allGot = false; break; }
   }
   if (allGot) {
-    const fullImage = rec.chunks.join('');
-    // Inject image into the reserved bubble
+    const fullData = rec.chunks.join('');
     if (rec.bubble) {
-      const img = document.createElement('img');
-      img.src = fullImage;
-      img.style.cssText = 'max-width:100%;border-radius:6px;margin-top:4px;display:block;cursor:pointer';
-      img.onclick = () => { const w = window.open(); w.document.write('<img src="'+fullImage+'">'); };
-      if (rec.text) rec.bubble.appendChild(document.createElement('br'));
-      rec.bubble.appendChild(img);
+      // Remove loading spinner if present
+      const spinner = rec.bubble.querySelector('.media-loading');
+      if (spinner) spinner.remove();
+
+      if (rec.mediaType === 'video') {
+        const vid = document.createElement('video');
+        vid.src = fullData;
+        vid.controls = true;
+        vid.style.cssText = 'max-width:100%;max-height:240px;border-radius:6px;margin-top:4px;display:block;background:#000';
+        vid.preload = 'metadata';
+        if (rec.text) rec.bubble.appendChild(document.createElement('br'));
+        rec.bubble.appendChild(vid);
+      } else {
+        const img = document.createElement('img');
+        img.src = fullData;
+        img.style.cssText = 'max-width:100%;border-radius:6px;margin-top:4px;display:block;cursor:pointer';
+        img.onclick = () => { const w = window.open(); w.document.write('<img src="'+fullData+'">'); };
+        if (rec.text) rec.bubble.appendChild(document.createElement('br'));
+        rec.bubble.appendChild(img);
+      }
       const container = document.getElementById('chatMessages');
       container.scrollTop = container.scrollHeight;
     }
@@ -2241,16 +2295,16 @@ function _applyChunk(msg) {
 
 let _lastOppAvatar = null; // track opponent's latest avatar for chat bubbles
 
-function appendChatBubble({ text, image, name, avatar, isMe, reserveId }) {
+function appendChatBubble({ text, image, video, gifUrl, mediaType, mediaLoading, name, avatar, isMe, reserveId }) {
   const container = document.getElementById('chatMessages');
   const wrap = document.createElement('div');
   wrap.style.cssText = `display:flex;flex-direction:column;align-items:${isMe?'flex-end':'flex-start'};gap:3px`;
 
   // Name + avatar row
   const nameRow = document.createElement('div');
-  nameRow.style.cssText = `display:flex;align-items:center;gap:5px;font-size:0.65rem;color:var(--text-dim);${isMe?'flex-direction:row-reverse':''}`;
+  nameRow.style.cssText = `display:flex;align-items:center;gap:5px;font-size:0.7rem;color:var(--text-dim);${isMe?'flex-direction:row-reverse':''}`;
   const avatarEl = document.createElement('div');
-  avatarEl.style.cssText = 'width:20px;height:20px;border-radius:50%;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:0.7rem;background:var(--felt-dark);border:1px solid var(--panel-border)';
+  avatarEl.style.cssText = 'width:26px;height:26px;border-radius:50%;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:0.85rem;background:var(--felt-dark);border:1px solid var(--panel-border)';
   if (avatar) {
     const ai = document.createElement('img');
     ai.src = avatar; ai.style.cssText = 'width:100%;height:100%;object-fit:cover';
@@ -2261,24 +2315,146 @@ function appendChatBubble({ text, image, name, avatar, isMe, reserveId }) {
 
   // Bubble
   const bubble = document.createElement('div');
-  bubble.style.cssText = `max-width:84%;padding:7px 10px;border-radius:${isMe?'12px 12px 3px 12px':'12px 12px 12px 3px'};background:${isMe?'rgba(201,168,76,0.15)':'rgba(255,255,255,0.06)'};border:1px solid ${isMe?'var(--gold-dim)':'var(--panel-border)'};font-size:0.82rem;color:var(--cream);word-break:break-word;line-height:1.5`;
+  const hasMediaOnly = !text && (image || video || gifUrl || mediaLoading);
+  bubble.style.cssText = `max-width:88%;${hasMediaOnly?'padding:4px':'padding:8px 12px'};border-radius:${isMe?'14px 14px 3px 14px':'14px 14px 14px 3px'};background:${isMe?'rgba(201,168,76,0.15)':'rgba(255,255,255,0.07)'};border:1px solid ${isMe?'var(--gold-dim)':'var(--panel-border)'};font-size:0.85rem;color:var(--cream);word-break:break-word;line-height:1.5;overflow:hidden`;
+
   if (text) {
     const t = document.createElement('span'); t.textContent = text; bubble.appendChild(t);
+  }
+  if (mediaLoading) {
+    // Show a loading indicator — _applyChunk will replace this when chunks arrive
+    const loader = document.createElement('div');
+    loader.className = 'media-loading';
+    const icon = mediaType === 'video' ? '🎬' : (mediaType === 'gif' ? '🎞' : '📷');
+    loader.style.cssText = 'padding:10px 14px;color:var(--text-dim);font-size:0.78rem;font-style:italic;display:flex;align-items:center;gap:6px';
+    loader.innerHTML = `<span style="animation:pulse 1.2s infinite">${icon}</span><span>Receiving…</span><span class="media-progress" style="color:var(--gold-dim)"></span>`;
+    if (text) bubble.appendChild(document.createElement('br'));
+    bubble.appendChild(loader);
   }
   if (image) {
     const img = document.createElement('img');
     img.src = image;
-    img.style.cssText = 'max-width:100%;border-radius:6px;margin-top:4px;display:block;cursor:pointer';
+    img.style.cssText = 'max-width:100%;border-radius:6px;margin-top:' + (text?'4px':'0') + ';display:block;cursor:pointer';
     img.onclick = () => { const w = window.open(); w.document.write('<img src="'+image+'">'); };
-    if (text) bubble.appendChild(document.createElement('br'));
     bubble.appendChild(img);
+  }
+  if (video) {
+    const vid = document.createElement('video');
+    vid.src = video;
+    vid.controls = true;
+    vid.style.cssText = 'max-width:100%;max-height:240px;border-radius:6px;margin-top:' + (text?'4px':'0') + ';display:block;background:#000';
+    vid.preload = 'metadata';
+    bubble.appendChild(vid);
+  }
+  if (gifUrl) {
+    const gif = document.createElement('img');
+    gif.src = gifUrl;
+    gif.alt = 'GIF';
+    gif.style.cssText = 'max-width:100%;max-height:200px;border-radius:6px;display:block;cursor:pointer;margin-top:' + (text?'4px':'0');
+    gif.onclick = () => window.open(gifUrl, '_blank');
+    bubble.appendChild(gif);
   }
 
   wrap.appendChild(nameRow);
   wrap.appendChild(bubble);
   container.appendChild(wrap);
   container.scrollTop = container.scrollHeight;
-  return bubble; // return bubble element so chunks can append to it
+  return bubble;
+}
+
+// ===================================================
+// GIPHY PICKER
+// ===================================================
+const GIPHY_API_KEY = 'dc6zaTOxFJmzC'; // public beta key
+
+function openGiphyPicker() {
+  const picker = document.getElementById('giphyPicker');
+  const isOpen = picker.style.display !== 'none';
+  picker.style.display = isOpen ? 'none' : 'block';
+  if (!isOpen) {
+    document.getElementById('giphySearch').focus();
+    // Load trending GIFs on open if results are empty
+    if (!document.getElementById('giphyResults').children.length) {
+      fetchGiphy('trending', '');
+    }
+  }
+}
+
+function closeGiphyPicker() {
+  document.getElementById('giphyPicker').style.display = 'none';
+}
+
+function giphyKeydown(e) {
+  if (e.key === 'Enter') { e.preventDefault(); searchGiphy(); }
+}
+
+function searchGiphy() {
+  const q = document.getElementById('giphySearch').value.trim();
+  fetchGiphy(q ? 'search' : 'trending', q);
+}
+
+async function fetchGiphy(mode, query) {
+  document.getElementById('giphyStatus').textContent = 'Loading…';
+  document.getElementById('giphyResults').innerHTML = '';
+  const base = 'https://api.giphy.com/v1/gifs/';
+  const url = mode === 'search'
+    ? `${base}search?api_key=${GIPHY_API_KEY}&q=${encodeURIComponent(query)}&limit=12&rating=pg-13`
+    : `${base}trending?api_key=${GIPHY_API_KEY}&limit=12&rating=pg-13`;
+  try {
+    const res = await fetch(url);
+    const data = await res.json();
+    const results = document.getElementById('giphyResults');
+    results.innerHTML = '';
+    if (!data.data || !data.data.length) {
+      document.getElementById('giphyStatus').textContent = 'No results';
+      return;
+    }
+    data.data.forEach(gif => {
+      const preview = gif.images.fixed_height_small.url;
+      const full = gif.images.downsized_medium?.url || gif.images.fixed_height.url;
+      const img = document.createElement('img');
+      img.src = preview;
+      img.title = gif.title;
+      img.style.cssText = 'width:100%;border-radius:4px;cursor:pointer;border:2px solid transparent;transition:border-color 0.15s';
+      img.onmouseover = () => img.style.borderColor = 'var(--gold-dim)';
+      img.onmouseleave = () => img.style.borderColor = 'transparent';
+      img.onclick = () => sendGif(full, gif.title);
+      results.appendChild(img);
+    });
+    document.getElementById('giphyStatus').textContent = 'Click a GIF to send';
+  } catch(e) {
+    document.getElementById('giphyStatus').textContent = 'Failed to load — check connection';
+  }
+}
+
+async function sendGif(url, title) {
+  closeGiphyPicker();
+  const caption = document.getElementById('chatInput').value.trim();
+
+  // Show locally
+  appendChatBubble({ text: caption, gifUrl: url, name: myName, avatar: myAvatar, isMe: true });
+
+  // Send over P2P — GIF is just a URL, no chunking needed
+  const encText = await encryptText(caption || '');
+  send({ type: 'chat_gif', encText, gifUrl: url, gifTitle: title, senderName: myName });
+
+  document.getElementById('chatInput').value = '';
+  // Also show on table bubble
+  showTableBubble('mySpeechBubbleZone', caption || '🎞 GIF', false, true);
+}
+
+async function receiveChatGif(msg) {
+  const text = await decryptText(msg.encText);
+  const caption = text === null ? '' : text;
+  appendChatBubble({ text: caption, gifUrl: msg.gifUrl, name: opponentNameStr, avatar: _lastOppAvatar, isMe: false });
+  showTableBubble('oppSpeechBubbleZone', caption || '🎞 GIF', false, false);
+
+  // Flash chat tab
+  const chatBtn = document.querySelectorAll('.tab-btn')[1];
+  if (chatBtn && !chatBtn.classList.contains('active')) {
+    chatBtn.style.color = 'var(--gold)';
+    setTimeout(() => { chatBtn.style.color = ''; }, 3000);
+  }
 }
 
 // ===================================================
@@ -2324,14 +2500,80 @@ function handleAvatarUpload(e) {
   });
 }
 
-function handleChatImageUpload(e) {
+const MAX_VIDEO_BYTES = 80 * 1024 * 1024; // 80 MB hard limit
+
+function handleChatMediaUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
-  resizeImage(file, 800, 600, 0.75, dataUrl => {
-    pendingChatImage = dataUrl;
-    document.getElementById('chatImgThumb').src = dataUrl;
-    document.getElementById('chatImagePreview').style.display = 'block';
-  });
+
+  const isVideo = file.type.startsWith('video/');
+  const isGif   = file.type === 'image/gif';
+
+  if (isVideo) {
+    if (file.size > MAX_VIDEO_BYTES) {
+      alert('Video is too large (max 80 MB). Please trim or compress it first.');
+      e.target.value = '';
+      return;
+    }
+    // Read video as-is — no canvas re-encode for video
+    const reader = new FileReader();
+    reader.onload = ev => {
+      pendingChatMedia = { dataUrl: ev.target.result, type: 'video', name: file.name };
+      showMediaPreview(pendingChatMedia);
+    };
+    reader.readAsDataURL(file);
+  } else if (isGif) {
+    // GIFs must not go through canvas (kills animation) — read raw
+    const reader = new FileReader();
+    reader.onload = ev => {
+      pendingChatMedia = { dataUrl: ev.target.result, type: 'gif', name: file.name };
+      showMediaPreview(pendingChatMedia);
+    };
+    reader.readAsDataURL(file);
+  } else {
+    // Static image — resize & compress
+    resizeImage(file, 1200, 900, 0.82, dataUrl => {
+      pendingChatMedia = { dataUrl, type: 'image', name: file.name };
+      showMediaPreview(pendingChatMedia);
+    });
+  }
+  e.target.value = ''; // reset so same file can be re-selected
+}
+
+function showMediaPreview(media) {
+  const preview = document.getElementById('chatMediaPreview');
+  const imgThumb = document.getElementById('chatImgThumb');
+  const vidThumb = document.getElementById('chatVidThumb');
+  const nameEl   = document.getElementById('chatMediaName');
+  const sizeEl   = document.getElementById('chatMediaSize');
+
+  imgThumb.style.display = 'none';
+  vidThumb.style.display = 'none';
+
+  if (media.type === 'video') {
+    vidThumb.src = media.dataUrl;
+    vidThumb.style.display = 'block';
+  } else {
+    imgThumb.src = media.dataUrl;
+    imgThumb.style.display = 'block';
+  }
+
+  nameEl.textContent = media.name;
+  const bytes = Math.round(media.dataUrl.length * 0.75); // approx decoded size
+  sizeEl.textContent = bytes < 1024*1024
+    ? (bytes/1024).toFixed(0) + ' KB'
+    : (bytes/1024/1024).toFixed(1) + ' MB';
+
+  preview.style.display = 'flex';
+}
+
+function clearChatMedia() {
+  pendingChatMedia = null;
+  const preview = document.getElementById('chatMediaPreview');
+  preview.style.display = 'none';
+  document.getElementById('chatImgThumb').src = '';
+  document.getElementById('chatVidThumb').src = '';
+  document.getElementById('chatMediaUpload').value = '';
 }
 
 function resizeImage(file, maxW, maxH, quality, cb) {
@@ -2352,12 +2594,7 @@ function resizeImage(file, maxW, maxH, quality, cb) {
   reader.readAsDataURL(file);
 }
 
-function clearChatImage() {
-  pendingChatImage = null;
-  document.getElementById('chatImagePreview').style.display = 'none';
-  document.getElementById('chatImgThumb').src = '';
-  document.getElementById('chatImageUpload').value = '';
-}
+// clearChatMedia defined above with full media support
 
 function broadcastProfile() {
   const name = (document.getElementById('myDisplayName').value || '').trim() || myName;
