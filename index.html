@@ -598,7 +598,7 @@ html,body { height:100%; overflow:hidden; background:#060f0a; font-family:'Spect
         <div class="player-info">
           <div id="tableOppAvatar" style="width:48px;height:48px;border-radius:50%;background:var(--felt-dark);border:2px solid var(--panel-border);display:flex;align-items:center;justify-content:center;font-size:1.3rem;overflow:hidden;flex-shrink:0"><span>&#128100;</span></div>
           <span class="player-name" id="opponentName">Opponent</span>
-          <span class="player-chips">&#127920; <span id="opponentChips">500</span></span>
+          <span class="player-chips">&#127920; <span id="opponentChips">50</span></span>
           <div class="player-bet-badge" id="opponentBetBadge">Bet: 0</div>
         </div>
         <div id="oppSpeechBubbleZone" style="min-height:0"></div>
@@ -634,7 +634,7 @@ html,body { height:100%; overflow:hidden; background:#060f0a; font-family:'Spect
         <div class="player-info">
           <div id="tableMyAvatar" style="width:48px;height:48px;border-radius:50%;background:var(--felt-dark);border:2px solid var(--gold-dim);display:flex;align-items:center;justify-content:center;font-size:1.3rem;overflow:hidden;flex-shrink:0"><span>&#127956;</span></div>
           <span class="player-name" id="playerName">You</span>
-          <span class="player-chips">&#127920; <span id="playerChips">500</span></span>
+          <span class="player-chips">&#127920; <span id="playerChips">50</span></span>
           <div class="player-bet-badge" id="playerBetBadge">Bet: 0</div>
         </div>
       </div>
@@ -1161,8 +1161,8 @@ let gameState = {
   pot: 0,
   myBet: 0,
   opponentBet: 0,
-  myChips: 10,
-  opponentChips: 10,
+  myChips: 50,
+  opponentChips: 50,
   myTurn: false,
   dealerIsMe: true,
   smallBlind: 5, bigBlind: 10,
@@ -1660,7 +1660,7 @@ function hideResult() {
 function resetGame() {
   gameState = {
     phase:'waiting', deck:[], myCards:[], opponentCards:[], community:[],
-    pot:0, myBet:0, opponentBet:0, myChips:500, opponentChips:500,
+    pot:0, myBet:0, opponentBet:0, myChips:50, opponentChips:50,
     myTurn:false, dealerIsMe:true, smallBlind:5, bigBlind:10,
     lastRaise:10, myFolded:false, opponentFolded:false,
     myActedThisRound:false, oppActedThisRound:false
