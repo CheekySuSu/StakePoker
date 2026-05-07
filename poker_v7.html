@@ -1,0 +1,2495 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>StakePoker — P2P Poker & Favour Exchange</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Spectral:ital,wght@0,300;0,400;0,500;1,300&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<style>
+:root {
+  --felt: #1a3d2b;
+  --felt-dark: #0f2419;
+  --felt-light: #22503a;
+  --gold: #c9a84c;
+  --gold-light: #e8c97a;
+  --gold-dim: #8a6f2e;
+  --cream: #f5ead8;
+  --cream-dim: #c4b49a;
+  --chip-red: #c0392b;
+  --chip-blue: #2980b9;
+  --chip-white: #ecf0f1;
+  --card-bg: #faf8f3;
+  --card-red: #c0392b;
+  --card-black: #1a1a2e;
+  --panel-bg: #0d2318;
+  --panel-border: #2a4a35;
+  --text-bright: #f5ead8;
+  --text-dim: #8aab96;
+  --accent: #c9a84c;
+  --danger: #e74c3c;
+  --success: #27ae60;
+  --shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+html,body { height:100%; overflow:hidden; background:#060f0a; font-family:'Spectral',serif; color:var(--text-bright); }
+
+/* ===== OVERLAY ===== */
+#overlay {
+  position:fixed; inset:0; z-index:100;
+  background:radial-gradient(ellipse at 30% 40%, #0f2419 0%, #060f0a 70%);
+  display:flex; align-items:flex-start; justify-content:center;
+  overflow-y:auto;
+  padding:24px 0;
+}
+.overlay-card {
+  background:var(--panel-bg);
+  border:1px solid var(--gold-dim);
+  border-radius:4px;
+  padding:40px 48px;
+  width:520px;
+  box-shadow:0 0 80px rgba(201,168,76,0.1), var(--shadow);
+  position:relative;
+  overflow:hidden;
+}
+.overlay-card::before {
+  content:'';
+  position:absolute; top:0; left:0; right:0; height:3px;
+  background:linear-gradient(90deg, transparent, var(--gold), transparent);
+}
+.overlay-title {
+  font-family:'Playfair Display',serif;
+  font-size:2rem; font-weight:700;
+  color:var(--gold);
+  text-align:center;
+  letter-spacing:0.05em;
+  margin-bottom:4px;
+}
+.overlay-sub {
+  text-align:center; color:var(--text-dim);
+  font-size:0.85rem; font-style:italic;
+  margin-bottom:32px;
+}
+.o-section { margin-bottom:28px; }
+.o-label {
+  font-size:0.7rem; letter-spacing:0.15em; text-transform:uppercase;
+  color:var(--gold-dim); margin-bottom:8px;
+}
+.o-input {
+  width:100%; background:#0a1e10; border:1px solid var(--panel-border);
+  border-radius:3px; padding:10px 14px;
+  color:var(--cream); font-family:'Spectral',serif; font-size:0.9rem;
+  outline:none; resize:none; transition:border-color 0.2s;
+}
+.o-input:focus { border-color:var(--gold-dim); }
+.o-input::placeholder { color:var(--text-dim); }
+.btn {
+  display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  padding:10px 22px; border-radius:3px; border:none; cursor:pointer;
+  font-family:'Spectral',serif; font-size:0.9rem; font-weight:500;
+  transition:all 0.2s; user-select:none;
+}
+.btn-gold {
+  background:linear-gradient(135deg, var(--gold-dim), var(--gold));
+  color:#0a1e10; font-weight:600;
+}
+.btn-gold:hover { filter:brightness(1.1); transform:translateY(-1px); }
+.btn-ghost {
+  background:transparent; border:1px solid var(--panel-border);
+  color:var(--text-dim);
+}
+.btn-ghost:hover { border-color:var(--gold-dim); color:var(--gold-dim); }
+.btn-danger { background:rgba(231,76,60,0.15); border:1px solid #c0392b; color:#e74c3c; }
+.btn-danger:hover { background:rgba(231,76,60,0.25); }
+.btn:disabled { opacity:0.4; cursor:not-allowed; transform:none; }
+.or-divider {
+  display:flex; align-items:center; gap:12px;
+  color:var(--text-dim); font-size:0.8rem; margin:16px 0;
+}
+.or-divider::before, .or-divider::after {
+  content:''; flex:1; height:1px; background:var(--panel-border);
+}
+.token-display {
+  background:#040d07; border:1px solid var(--gold-dim);
+  border-radius:3px; padding:12px;
+  word-break:break-all; font-size:0.7rem;
+  color:var(--gold-light); font-family:monospace;
+  min-height:48px; max-height:80px; overflow-y:auto;
+  cursor:pointer; position:relative;
+}
+.token-display:hover::after {
+  content:'Click to copy';
+  position:absolute; bottom:4px; right:8px;
+  font-size:0.6rem; color:var(--gold-dim); pointer-events:none;
+}
+.status-dot {
+  width:8px; height:8px; border-radius:50%;
+  display:inline-block; margin-right:6px;
+}
+.dot-waiting { background:#f39c12; box-shadow:0 0 6px #f39c12; }
+.dot-connected { background:#27ae60; box-shadow:0 0 6px #27ae60; }
+.status-line {
+  font-size:0.78rem; color:var(--text-dim);
+  display:flex; align-items:center; margin-top:8px;
+}
+#apiKeySection { margin-bottom:16px; }
+
+/* ===== MAIN LAYOUT ===== */
+#app { height:100vh; display:grid; grid-template-rows:48px 1fr; }
+#topbar {
+  background:var(--panel-bg); border-bottom:1px solid var(--panel-border);
+  display:flex; align-items:center; padding:0 20px; gap:20px;
+  box-shadow:0 2px 12px rgba(0,0,0,0.4);
+}
+.topbar-logo {
+  font-family:'Playfair Display',serif; font-size:1.1rem;
+  color:var(--gold); letter-spacing:0.08em;
+}
+.topbar-chips {
+  display:flex; align-items:center; gap:6px;
+  background:rgba(201,168,76,0.08); border:1px solid var(--gold-dim);
+  border-radius:20px; padding:4px 12px;
+  font-size:0.8rem; color:var(--gold-light);
+}
+.chip-icon { font-size:1rem; }
+.topbar-conn {
+  margin-left:auto; display:flex; align-items:center; gap:8px;
+  font-size:0.75rem; color:var(--text-dim);
+}
+.topbar-btn {
+  padding:4px 12px; font-size:0.72rem;
+  background:transparent; border:1px solid var(--panel-border);
+  color:var(--text-dim); border-radius:20px; cursor:pointer;
+  font-family:'Spectral',serif; transition:all 0.2s;
+}
+.topbar-btn:hover { border-color:var(--gold-dim); color:var(--gold-dim); }
+
+#main { display:grid; grid-template-columns:1fr 320px; overflow:hidden; }
+
+/* ===== POKER TABLE ===== */
+#tableArea {
+  background:radial-gradient(ellipse at 50% 50%, var(--felt-light) 0%, var(--felt) 45%, var(--felt-dark) 100%);
+  position:relative; display:flex; flex-direction:column;
+  align-items:center; justify-content:space-between;
+  padding:20px; overflow:hidden;
+}
+#tableArea::before {
+  content:''; position:absolute; inset:12px;
+  border:2px solid rgba(201,168,76,0.25);
+  border-radius:200px; pointer-events:none;
+}
+#tableArea::after {
+  content:''; position:absolute; inset:16px;
+  border:1px solid rgba(201,168,76,0.1);
+  border-radius:196px; pointer-events:none;
+}
+
+/* Opponent zone */
+.player-zone {
+  width:100%; display:flex; flex-direction:column; align-items:center; gap:8px;
+  z-index:1;
+}
+.player-label {
+  font-size:0.7rem; letter-spacing:0.15em; text-transform:uppercase;
+  color:var(--text-dim);
+}
+.player-info {
+  display:flex; align-items:center; gap:12px;
+  background:rgba(0,0,0,0.35); border:1px solid var(--panel-border);
+  border-radius:24px; padding:6px 16px;
+}
+.player-name { font-size:0.85rem; color:var(--cream); font-weight:500; }
+.player-chips { font-size:0.75rem; color:var(--gold-dim); }
+.player-bet-badge {
+  background:rgba(201,168,76,0.15); border:1px solid var(--gold-dim);
+  border-radius:12px; padding:2px 10px;
+  font-size:0.72rem; color:var(--gold); display:none;
+}
+
+/* Cards */
+.hand-cards { display:flex; gap:8px; min-height:80px; align-items:center; }
+.card {
+  width:54px; height:76px; border-radius:6px;
+  background:var(--card-bg);
+  box-shadow:2px 4px 12px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.9);
+  display:flex; flex-direction:column; justify-content:space-between;
+  padding:5px; font-size:1.1rem; font-weight:700;
+  position:relative; transition:transform 0.3s;
+  border:1px solid rgba(0,0,0,0.15);
+  user-select:none;
+}
+.card.red { color:var(--card-red); }
+.card.black { color:var(--card-black); }
+.card.back {
+  background:linear-gradient(135deg, #1a3a6b 25%, #0d2040 25%, #0d2040 50%, #1a3a6b 50%, #1a3a6b 75%, #0d2040 75%);
+  background-size:12px 12px;
+  border:2px solid #2a4a8b;
+}
+.card.back::after {
+  content:''; position:absolute; inset:4px;
+  border:1px solid rgba(100,150,255,0.3); border-radius:3px;
+}
+.card-value { font-size:0.9rem; line-height:1; }
+.card-suit { font-size:0.85rem; text-align:right; }
+.card.highlight { transform:translateY(-8px); box-shadow:2px 4px 20px rgba(201,168,76,0.5); }
+.card-placeholder {
+  width:54px; height:76px; border-radius:6px;
+  border:1px dashed rgba(201,168,76,0.2);
+}
+
+/* Community cards */
+#communityArea {
+  display:flex; flex-direction:column; align-items:center; gap:10px; z-index:1;
+}
+#communityCards { display:flex; gap:8px; min-height:76px; align-items:center; }
+.phase-label {
+  font-size:0.65rem; letter-spacing:0.2em; text-transform:uppercase;
+  color:var(--gold-dim);
+}
+
+/* Pot */
+#potDisplay {
+  display:flex; align-items:center; gap:24px; z-index:1;
+  background:rgba(0,0,0,0.35); border:1px solid var(--panel-border);
+  border-radius:24px; padding:8px 24px;
+}
+.pot-item { text-align:center; }
+.pot-label { font-size:0.6rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--text-dim); }
+.pot-value { font-size:1.1rem; color:var(--gold-light); font-family:'Playfair Display',serif; }
+
+/* Action area */
+#actionArea {
+  width:100%; z-index:1; display:flex; flex-direction:column; align-items:center; gap:10px;
+}
+#actionBtns { display:flex; gap:8px; flex-wrap:wrap; justify-content:center; }
+.action-btn {
+  padding:9px 20px; border-radius:3px; border:none; cursor:pointer;
+  font-family:'Playfair Display',serif; font-size:0.85rem; font-weight:600;
+  letter-spacing:0.05em; transition:all 0.2s;
+}
+.action-btn:disabled { opacity:0.3; cursor:not-allowed; }
+.btn-fold { background:rgba(192,57,43,0.2); border:1px solid #c0392b; color:#e74c3c; }
+.btn-fold:hover:not(:disabled) { background:rgba(192,57,43,0.35); }
+.btn-check { background:rgba(39,174,96,0.2); border:1px solid #27ae60; color:#2ecc71; }
+.btn-check:hover:not(:disabled) { background:rgba(39,174,96,0.35); }
+.btn-call { background:rgba(52,152,219,0.2); border:1px solid #2980b9; color:#3498db; }
+.btn-call:hover:not(:disabled) { background:rgba(52,152,219,0.35); }
+.btn-raise { background:rgba(201,168,76,0.2); border:1px solid var(--gold-dim); color:var(--gold); }
+.btn-raise:hover:not(:disabled) { background:rgba(201,168,76,0.35); }
+.btn-deal { 
+  background:linear-gradient(135deg, var(--gold-dim), var(--gold));
+  color:#0a1e10; padding:10px 32px; font-size:0.9rem;
+}
+.btn-deal:hover:not(:disabled) { filter:brightness(1.1); }
+.raise-area { display:flex; gap:8px; align-items:center; }
+.raise-input {
+  background:#0a1e10; border:1px solid var(--panel-border);
+  border-radius:3px; padding:7px 12px; color:var(--cream);
+  font-family:'Spectral',serif; font-size:0.9rem; width:90px; outline:none;
+}
+.raise-input:focus { border-color:var(--gold-dim); }
+#gameMessage {
+  text-align:center; min-height:24px;
+  color:var(--gold-light); font-size:0.85rem; font-style:italic;
+}
+
+/* ===== SIDE PANEL ===== */
+#sidePanel {
+  background:var(--panel-bg); border-left:1px solid var(--panel-border);
+  display:flex; flex-direction:column; overflow:hidden;
+}
+.tab-bar {
+  display:flex; border-bottom:1px solid var(--panel-border);
+  flex-shrink:0;
+}
+.tab-btn {
+  flex:1; padding:12px; background:transparent; border:none; cursor:pointer;
+  font-family:'Spectral',serif; font-size:0.8rem; letter-spacing:0.1em;
+  text-transform:uppercase; color:var(--text-dim); transition:all 0.2s;
+  border-bottom:2px solid transparent;
+}
+.tab-btn.active { color:var(--gold); border-bottom-color:var(--gold); }
+.tab-content { display:none; flex:1; overflow-y:auto; padding:16px; }
+.tab-content.active { display:block; }
+
+/* Stakes tab */
+.stakes-section { margin-bottom:20px; }
+.stakes-header {
+  font-size:0.65rem; letter-spacing:0.2em; text-transform:uppercase;
+  color:var(--gold-dim); padding-bottom:8px;
+  border-bottom:1px solid var(--panel-border); margin-bottom:12px;
+  display:flex; justify-content:space-between; align-items:center;
+}
+.stake-card {
+  background:#0a1e10; border:1px solid var(--panel-border);
+  border-radius:4px; padding:10px 12px; margin-bottom:8px;
+  transition:border-color 0.2s;
+}
+.stake-card:hover { border-color:var(--gold-dim); }
+.stake-description { font-size:0.85rem; color:var(--cream); margin-bottom:6px; }
+.stake-footer { display:flex; align-items:center; justify-content:space-between; }
+.stake-coins { font-size:0.75rem; color:var(--gold); }
+.stake-actions { display:flex; gap:4px; }
+.mini-btn {
+  padding:3px 10px; border-radius:2px; border:none; cursor:pointer;
+  font-family:'Spectral',serif; font-size:0.7rem; transition:all 0.2s;
+}
+.mini-btn-buyback { background:rgba(201,168,76,0.15); color:var(--gold); border:1px solid var(--gold-dim); }
+.mini-btn-buyback:hover { background:rgba(201,168,76,0.3); }
+.mini-btn-buy { background:rgba(52,152,219,0.15); color:#3498db; border:1px solid #2980b9; }
+.mini-btn-buy:hover { background:rgba(52,152,219,0.3); }
+.empty-state { color:var(--text-dim); font-size:0.8rem; font-style:italic; text-align:center; padding:16px 0; }
+
+/* Add stake form */
+.add-stake-form {
+  background:#0a1e10; border:1px solid var(--panel-border);
+  border-radius:4px; padding:12px; margin-bottom:16px;
+}
+.form-label { font-size:0.65rem; letter-spacing:0.15em; text-transform:uppercase; color:var(--gold-dim); margin-bottom:6px; display:block; }
+.stake-textarea {
+  width:100%; background:#060f0a; border:1px solid var(--panel-border);
+  border-radius:2px; padding:8px; color:var(--cream);
+  font-family:'Spectral',serif; font-size:0.82rem; resize:none;
+  outline:none; height:64px;
+}
+.stake-textarea:focus { border-color:var(--gold-dim); }
+.form-footer { display:flex; justify-content:space-between; align-items:center; margin-top:8px; gap:8px; }
+.coins-badge {
+  font-size:0.78rem; color:var(--gold-light);
+  background:rgba(201,168,76,0.1); border:1px solid var(--gold-dim);
+  border-radius:12px; padding:3px 10px;
+  min-width:80px; text-align:center;
+}
+.llm-thinking { color:var(--text-dim); font-style:italic; font-size:0.75rem; animation:pulse 1.5s infinite; }
+@keyframes pulse { 0%,100%{opacity:0.4} 50%{opacity:1} }
+
+/* Log tab */
+.log-entry {
+  font-size:0.78rem; padding:5px 0; border-bottom:1px solid rgba(255,255,255,0.04);
+  color:var(--text-dim);
+}
+.log-entry .log-time { color:var(--gold-dim); margin-right:6px; font-size:0.68rem; }
+.log-entry.log-action { color:var(--cream); }
+.log-entry.log-win { color:#27ae60; }
+.log-entry.log-system { color:var(--gold-dim); font-style:italic; }
+
+/* ===== SPEECH BUBBLE ON TABLE ===== */
+.table-speech-bubble {
+  position: relative;
+  background: #ffffff;
+  border: 1px solid #ddd;
+  border-radius: 12px 12px 12px 3px;
+  padding: 6px 11px;
+  font-size: 0.75rem;
+  color: #1a1a1a;
+  max-width: 180px;
+  word-break: break-word;
+  z-index: 5;
+  cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+  animation: bubblePop 0.25s cubic-bezier(0.34,1.56,0.64,1);
+  transition: opacity 0.3s, transform 0.3s;
+}
+.table-speech-bubble.mine {
+  border-radius: 12px 12px 3px 12px;
+  background: #fffbe6;
+  border-color: #c9a84c;
+  color: #3a2e00;
+}
+.table-speech-bubble .bubble-img-label {
+  display: flex; align-items: center; gap: 4px; color: #555;
+}
+.table-speech-bubble.fade-out {
+  opacity: 0; transform: translateY(-4px) scale(0.95);
+  pointer-events: none;
+}
+@keyframes bubblePop {
+  from { opacity:0; transform: scale(0.7) translateY(4px); }
+  to   { opacity:1; transform: scale(1) translateY(0); }
+}
+
+/* ===== DISCONNECT TOAST ===== */
+#disconnectToast {
+  position: fixed;
+  bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: #c0392b; color: #fff;
+  border-radius: 24px; padding: 10px 24px;
+  font-size: 0.85rem; font-family: 'Spectral', serif;
+  z-index: 200; display: none;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+  animation: toastSlide 0.3s ease;
+}
+@keyframes toastSlide {
+  from { opacity:0; transform: translateX(-50%) translateY(10px); }
+  to   { opacity:1; transform: translateX(-50%) translateY(0); }
+}
+
+/* ===== MOBILE / PHONE VIEW ===== */
+@media (max-width: 640px) {
+  html, body { overflow: auto; }
+  #app { height: auto; min-height: 100vh; grid-template-rows: auto 1fr; }
+  #topbar { padding: 0 12px; gap: 10px; flex-wrap: wrap; height: auto; min-height: 44px; }
+  .topbar-logo { font-size: 0.95rem; }
+  #main { grid-template-columns: 1fr; grid-template-rows: auto auto; overflow: visible; }
+
+  /* Table area — compact on mobile */
+  #tableArea { padding: 10px 8px; min-height: 320px; }
+  #tableArea::before, #tableArea::after { border-radius: 120px; }
+  .hand-cards { min-height: 60px; }
+  .card { width: 42px; height: 60px; font-size: 0.85rem; padding: 3px; }
+  .card-value { font-size: 0.75rem; }
+  .card-suit { font-size: 0.7rem; }
+  .card-placeholder { width: 42px; height: 60px; }
+  #potDisplay { padding: 6px 14px; gap: 14px; }
+  .pot-value { font-size: 0.9rem; }
+  #actionBtns { gap: 5px; }
+  .action-btn { padding: 7px 12px; font-size: 0.75rem; }
+  .raise-input { width: 70px; padding: 5px 8px; font-size: 0.8rem; }
+  .player-info { padding: 4px 10px; gap: 8px; flex-wrap: wrap; justify-content: center; }
+
+  /* Side panel becomes full-width below table */
+  #sidePanel { border-left: none; border-top: 1px solid var(--panel-border); height: auto; min-height: 0; }
+  .tab-content { max-height: none; }
+  #chatMessages { max-height: 220px; }
+
+  /* Overlay card full-width on mobile, scrollable */
+  .overlay-card { width: 92vw; padding: 20px 16px; margin: auto; }
+  .overlay-title { font-size: 1.4rem; }
+  .o-section { margin-bottom: 20px; }
+  .or-divider { margin: 12px 0; font-size: 0.75rem; }
+  .token-display { font-size: 0.65rem; min-height: 40px; }
+
+  /* Result box */
+  .result-box { padding: 20px 24px; }
+  .result-title { font-size: 1.2rem; }
+
+  /* Speech bubble on mobile */
+  .table-speech-bubble { max-width: 130px; font-size: 0.7rem; }
+}
+
+@media (max-width: 400px) {
+  .card { width: 36px; height: 52px; font-size: 0.75rem; padding: 2px; }
+  .card-placeholder { width: 36px; height: 52px; }
+  .action-btn { padding: 6px 9px; font-size: 0.7rem; letter-spacing: 0; }
+  #communityCards { gap: 4px; }
+  .hand-cards { gap: 4px; }
+}
+
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--panel-border); border-radius:2px; }
+
+/* Hand result overlay */
+#handResult {
+  position:absolute; inset:0; z-index:10;
+  background:rgba(0,0,0,0.75);
+  display:none; align-items:center; justify-content:center; flex-direction:column;
+  gap:12px;
+}
+.result-box {
+  background:var(--panel-bg); border:2px solid var(--gold);
+  border-radius:6px; padding:28px 44px; text-align:center;
+  box-shadow:0 0 60px rgba(201,168,76,0.3);
+}
+.result-title {
+  font-family:'Playfair Display',serif; font-size:1.6rem;
+  color:var(--gold); margin-bottom:8px;
+}
+.result-hand { font-size:0.9rem; color:var(--cream-dim); margin-bottom:16px; }
+</style>
+</head>
+<body>
+
+<!-- CONNECTION OVERLAY -->
+<div id="overlay">
+  <div class="overlay-card">
+    <div class="overlay-title">♠ StakePoker ♦</div>
+    <div class="overlay-sub">Serverless P2P · Token Exchange · Favour Economy</div>
+
+    <div id="apiKeySection" class="o-section">
+      <div class="o-label">AI Provider — Stake Evaluation</div>
+      <select class="o-input" id="providerSelect" onchange="onProviderChange()" style="cursor:pointer;margin-bottom:8px">
+        <option value="anthropic">Anthropic Claude (claude.ai / API key)</option>
+        <option value="openai">OpenAI GPT-4o mini</option>
+        <option value="gemini">Google Gemini 1.5 Flash</option>
+        <option value="custom">Custom OpenAI-compatible endpoint</option>
+        <option value="none">No API — Negotiate stakes with opponent</option>
+      </select>
+      <div id="apiKeyRow">
+        <div class="o-label" id="apiKeyLabel">API Key (AI Interfacing may not work)</div>
+        <input type="password" class="o-input" id="apiKeyInput" placeholder="Leave blank if running in Claude.ai">
+      </div>
+      <div id="customEndpointRow" style="display:none;margin-top:8px">
+        <div class="o-label">Endpoint URL</div>
+        <input type="text" class="o-input" id="customEndpointInput" placeholder="https://your-llm-api.com/v1/chat/completions" style="margin-bottom:6px">
+        <div class="o-label">Model Name</div>
+        <input type="text" class="o-input" id="customModelInput" placeholder="gpt-4o-mini" style="margin-top:4px">
+      </div>
+      <div id="noApiNote" style="display:none;margin-top:8px;font-size:0.75rem;color:var(--gold-dim);font-style:italic">
+        ✦ Stakes will be negotiated between players — vote to agree, or receive a suggested compromise
+      </div>
+    </div>
+
+    <div class="o-section">
+      <div class="o-label">Your Name</div>
+      <input type="text" class="o-input" id="playerNameInput" placeholder="Enter your name" value="Player 1">
+    </div>
+
+    <div class="o-section">
+      <div class="o-label">Step 1 — Get your room code</div>
+      <button class="btn btn-gold" id="generateBtn" onclick="generateRoomCode()" style="width:100%;margin-bottom:10px">
+        ⚡ Get Room Code
+      </button>
+      <div class="token-display" id="myTokenDisplay" onclick="copyToken()" title="Click to copy — share with opponent">
+        Click above to get your room code
+      </div>
+      <div class="status-line">
+        <span class="status-dot dot-waiting" id="genDot"></span>
+        <span id="genStatus">Not connected to relay yet</span>
+      </div>
+    </div>
+
+    <div class="or-divider">share your code with opponent, then enter theirs below</div>
+
+    <div class="o-section">
+      <div class="o-label">Step 2 — Enter partner's room code</div>
+      <input type="text" class="o-input" id="peerTokenInput" placeholder="e.g. abc1234xyz" style="font-family:monospace;letter-spacing:0.08em;font-size:0.95rem">
+      <button class="btn btn-gold" id="connectBtn" onclick="connectToRoom()" style="width:100%;margin-top:8px" disabled>
+        🃏 Connect & Play
+      </button>
+      <div class="status-line">
+        <span class="status-dot dot-waiting" id="connDot"></span>
+        <span id="connStatus">Enter a room code to connect</span>
+      </div>
+    </div>
+
+    <div class="or-divider">or</div>
+
+    <div class="o-section" style="margin-bottom:0">
+      <button class="btn btn-ghost" onclick="startSoloMode()" style="width:100%;padding:9px">
+        🤖 Play Solo vs AI (no connection needed)
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP (hidden until connected) -->
+<div id="app" style="display:none">
+  <div id="topbar">
+    <span class="topbar-logo">♠ StakePoker</span>
+    <div style="display:flex;align-items:center;gap:6px;font-size:0.78rem;color:var(--text-dim)">
+      <span id="topbarPlayer" style="color:var(--cream)"></span>
+      <span>vs</span>
+      <span id="topbarOpponent"></span>
+    </div>
+    <div class="topbar-conn">
+      <span class="status-dot dot-connected"></span>
+      <span>P2P Connected</span>
+      <button class="topbar-btn" onclick="showOverlay()">Disconnect</button>
+    </div>
+  </div>
+
+  <div id="main">
+    <!-- POKER TABLE -->
+    <div id="tableArea">
+      <!-- Opponent -->
+      <div class="player-zone" id="opponentZone" style="position:relative">
+        <div class="player-info">
+          <div id="tableOppAvatar" style="width:28px;height:28px;border-radius:50%;background:var(--felt-dark);border:1px solid var(--panel-border);display:flex;align-items:center;justify-content:center;font-size:0.8rem;overflow:hidden;flex-shrink:0"><span>&#128100;</span></div>
+          <span class="player-name" id="opponentName">Opponent</span>
+          <span class="player-chips">&#127920; <span id="opponentChips">500</span></span>
+          <div class="player-bet-badge" id="opponentBetBadge">Bet: 0</div>
+        </div>
+        <div id="oppSpeechBubbleZone" style="min-height:0"></div>
+        <div class="hand-cards" id="opponentCards"></div>
+      </div>
+
+      <!-- Community Cards -->
+      <div id="communityArea">
+        <div class="phase-label" id="phaseLabel">Waiting for deal</div>
+        <div id="communityCards"></div>
+      </div>
+
+      <!-- Pot -->
+      <div id="potDisplay">
+        <div class="pot-item">
+          <div class="pot-label">Opp. Bet</div>
+          <div class="pot-value" id="oppBetValue">0</div>
+        </div>
+        <div class="pot-item">
+          <div class="pot-label">Pot</div>
+          <div class="pot-value" id="potValue">0</div>
+        </div>
+        <div class="pot-item">
+          <div class="pot-label">Your Bet</div>
+          <div class="pot-value" id="myBetValue">0</div>
+        </div>
+      </div>
+
+      <!-- Player -->
+      <div class="player-zone" id="playerZone" style="position:relative">
+        <div id="mySpeechBubbleZone" style="min-height:0"></div>
+        <div class="hand-cards" id="playerCards"></div>
+        <div class="player-info">
+          <div id="tableMyAvatar" style="width:28px;height:28px;border-radius:50%;background:var(--felt-dark);border:2px solid var(--gold-dim);display:flex;align-items:center;justify-content:center;font-size:0.8rem;overflow:hidden;flex-shrink:0"><span>&#127956;</span></div>
+          <span class="player-name" id="playerName">You</span>
+          <span class="player-chips">&#127920; <span id="playerChips">500</span></span>
+          <div class="player-bet-badge" id="playerBetBadge">Bet: 0</div>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div id="actionArea">
+        <div id="gameMessage">Waiting for game to start...</div>
+        <div id="actionBtns">
+          <button class="action-btn btn-deal" id="dealBtn" onclick="requestDeal()" disabled>Deal Cards</button>
+          <button class="action-btn btn-fold" id="foldBtn" onclick="playerAction('fold')" style="display:none" disabled>Fold</button>
+          <button class="action-btn btn-check" id="checkBtn" onclick="playerAction('check')" style="display:none" disabled>Check</button>
+          <button class="action-btn btn-call" id="callBtn" onclick="playerAction('call')" style="display:none" disabled>Call</button>
+          <div class="raise-area" id="raiseArea" style="display:none">
+            <input type="number" class="raise-input" id="raiseAmount" value="20" min="1">
+            <button class="action-btn btn-raise" id="raiseBtn" onclick="playerAction('raise')" disabled>Raise</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hand result overlay -->
+      <div id="handResult">
+        <div class="result-box">
+          <div class="result-title" id="resultTitle"></div>
+          <div class="result-hand" id="resultHand"></div>
+          <button class="btn btn-gold" onclick="hideResult();requestDeal()">Deal Again</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- SIDE PANEL -->
+    <div id="sidePanel">
+      <div class="tab-bar">
+        <button class="tab-btn active" onclick="switchTab('stakes')">Stakes</button>
+        <button class="tab-btn" onclick="switchTab('log')">Chat &#128172;</button>
+      </div>
+
+      <!-- Stakes Tab -->
+      <div class="tab-content active" id="tab-stakes">
+        <!-- Add stake form -->
+        <div class="add-stake-form">
+          <label class="form-label">Describe a stake (e.g. "I cooked dinner")</label>
+          <textarea class="stake-textarea" id="stakeInput" placeholder="What did you do or promise to do?"></textarea>
+          <div class="form-footer">
+            <div class="coins-badge" id="stakeCoinsPreview">— coins</div>
+            <button class="btn btn-gold" onclick="evaluateStake()" id="evalBtn" style="padding:6px 14px;font-size:0.78rem">
+              Evaluate
+            </button>
+            <button class="btn" style="background:rgba(201,168,76,0.15);border:1px solid var(--gold-dim);color:var(--gold);padding:6px 14px;font-size:0.78rem" onclick="submitStake()" id="submitStakeBtn" disabled>
+              Submit
+            </button>
+          </div>
+          <div id="evalStatus" style="font-size:0.72rem;color:var(--text-dim);margin-top:6px;font-style:italic;min-height:16px"></div>
+        </div>
+
+        <!-- Negotiation panel -->
+        <div id="negotiationPanel" style="display:none" class="add-stake-form" >
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+            <span style="font-size:0.65rem;letter-spacing:0.2em;text-transform:uppercase;color:var(--gold-dim)">⚖ Stake Negotiation</span>
+            <span id="negRoundLabel" style="font-size:0.7rem;color:var(--text-dim)">Round 1/3</span>
+          </div>
+          <div id="negDesc" style="font-size:0.82rem;color:var(--cream);margin-bottom:8px;font-style:italic"></div>
+          <div id="negTheirOffer" style="font-size:0.88rem;color:var(--gold-light);margin-bottom:10px"></div>
+          <div id="negCounterArea" style="display:none;margin-bottom:10px">
+            <label class="form-label">Your counter-offer</label>
+            <div style="display:flex;align-items:center;gap:10px">
+              <input type="range" id="negSlider" min="5" max="500" value="50" oninput="negSliderUpdate()" style="flex:1;accent-color:var(--gold)">
+              <span id="negSliderVal" style="color:var(--gold-light);font-size:0.88rem;min-width:60px">50 coins</span>
+            </div>
+          </div>
+          <div id="negSuggestArea" style="display:none;padding:8px;background:rgba(201,168,76,0.08);border:1px solid var(--gold-dim);border-radius:4px;margin-bottom:10px">
+            <div style="font-size:0.75rem;color:var(--gold-dim);margin-bottom:4px">No consensus — system suggests:</div>
+            <div id="negSuggestVal" style="font-size:1.1rem;color:var(--gold);font-family:'Playfair Display',serif"></div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap" id="negBtns">
+            <button class="btn btn-gold" id="negAcceptBtn" onclick="negAccept()" style="padding:5px 12px;font-size:0.78rem">✓ Accept</button>
+            <button class="btn btn-ghost" id="negCounterBtn" onclick="negShowCounter()" style="padding:5px 12px;font-size:0.78rem">↔ Counter</button>
+            <button class="btn btn-ghost" id="negSendCounterBtn" onclick="negSendCounter()" style="display:none;padding:5px 12px;font-size:0.78rem">Send Counter</button>
+            <button class="btn btn-danger" id="negDeclineBtn" onclick="negDecline()" style="display:none;padding:5px 12px;font-size:0.78rem">✗ Decline</button>
+          </div>
+          <div id="negStatus" style="font-size:0.72rem;color:var(--text-dim);margin-top:6px;font-style:italic;min-height:14px"></div>
+        </div>
+
+        <!-- Your stakes -->
+        <div class="stakes-section">
+          <div class="stakes-header">
+            <span>Your Stakes</span>
+          </div>
+          <div id="myStakesList"><div class="empty-state">No stakes submitted yet</div></div>
+        </div>
+
+        <!-- Opponent stakes -->
+        <div class="stakes-section">
+          <div class="stakes-header">
+            <span>Opponent's Stakes</span>
+          </div>
+          <div id="theirStakesList"><div class="empty-state">No opponent stakes available</div></div>
+        </div>
+      </div>
+
+      <!-- Chat Tab -->
+      <div class="tab-content" id="tab-log">
+        <div id="profileSection" style="background:#0a1e10;border:1px solid var(--panel-border);border-radius:4px;padding:12px;margin-bottom:12px">
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+            <div id="myAvatarPreview" style="width:44px;height:44px;border-radius:50%;background:var(--felt);border:2px solid var(--gold-dim);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;overflow:hidden;cursor:pointer" onclick="document.getElementById('avatarUpload').click()" title="Click to change avatar">
+              <span id="myAvatarEmoji">&#127956;</span>
+              <img id="myAvatarImg" style="display:none;width:100%;height:100%;object-fit:cover">
+            </div>
+            <div style="flex:1;min-width:0">
+              <div style="display:flex;align-items:center;gap:6px">
+                <input type="text" id="myDisplayName" value="" placeholder="Your name" style="background:transparent;border:none;border-bottom:1px solid var(--panel-border);color:var(--cream);font-family:'Spectral',serif;font-size:0.88rem;outline:none;flex:1;min-width:0" oninput="broadcastProfile()">
+                <span style="font-size:0.6rem;color:var(--gold-dim);cursor:pointer" onclick="document.getElementById('avatarUpload').click()">&#9998; pic</span>
+              </div>
+              <div style="font-size:0.65rem;color:var(--text-dim);margin-top:2px">Click name or pic to edit</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;font-size:0.7rem;color:var(--text-dim)">
+            <div id="opponentAvatarPreview" style="width:28px;height:28px;border-radius:50%;background:var(--felt-dark);border:1px solid var(--panel-border);display:flex;align-items:center;justify-content:center;font-size:0.8rem;overflow:hidden;flex-shrink:0">
+              <span id="oppAvatarEmoji">&#128100;</span>
+              <img id="oppAvatarImg" style="display:none;width:100%;height:100%;object-fit:cover">
+            </div>
+            <span id="opponentChatName" style="color:var(--cream-dim)">Opponent</span>
+            <span style="margin-left:auto;font-size:0.6rem;color:var(--gold-dim)">&#128274; E2E encrypted</span>
+          </div>
+          <input type="file" id="avatarUpload" accept="image/*" style="display:none" onchange="handleAvatarUpload(event)">
+        </div>
+        <div id="chatMessages" style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;max-height:300px;overflow-y:auto;padding-right:2px"></div>
+        <div style="background:#0a1e10;border:1px solid var(--panel-border);border-radius:4px;padding:10px">
+          <textarea id="chatInput" placeholder="Type a message..." style="width:100%;background:transparent;border:none;color:var(--cream);font-family:'Spectral',serif;font-size:0.83rem;resize:none;outline:none;height:52px;line-height:1.4" onkeydown="chatKeydown(event)"></textarea>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-top:6px">
+            <label style="cursor:pointer;color:var(--gold-dim);font-size:0.75rem;display:flex;align-items:center;gap:4px">
+              &#128206; <span style="font-size:0.7rem">Attach</span>
+              <input type="file" id="chatImageUpload" accept="image/*" style="display:none" onchange="handleChatImageUpload(event)">
+            </label>
+            <button class="btn btn-gold" onclick="sendChatMessage()" style="padding:5px 14px;font-size:0.78rem">Send &#8629;</button>
+          </div>
+          <div id="chatImagePreview" style="display:none;margin-top:6px;position:relative">
+            <img id="chatImgThumb" style="max-height:60px;border-radius:3px;border:1px solid var(--gold-dim)">
+            <button onclick="clearChatImage()" style="position:absolute;top:-4px;right:-4px;background:#c0392b;border:none;color:white;border-radius:50%;width:16px;height:16px;font-size:0.6rem;cursor:pointer;line-height:1">X</button>
+          </div>
+        </div>
+        <div id="gameLog" style="margin-top:10px;font-size:0.7rem;color:var(--text-dim);max-height:80px;overflow-y:auto"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- DISCONNECT TOAST -->
+<div id="disconnectToast">⚠ Opponent disconnected</div>
+
+<script>
+// ===================================================
+const AI_PROVIDER_CONFIG = {
+  anthropic: {
+    url: () => 'https://api.anthropic.com/v1/messages',
+    headers: (key) => {
+      const h = { 'Content-Type': 'application/json', 'anthropic-version': '2023-06-01', 'anthropic-dangerous-direct-browser-access': 'true' };
+      if (key) h['x-api-key'] = key;
+      return h;
+    },
+    body: (prompt) => JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 16, messages: [{ role: 'user', content: prompt }] }),
+    extract: (data) => data.content?.[0]?.text?.trim()
+  },
+  openai: {
+    url: () => 'https://api.openai.com/v1/chat/completions',
+    headers: (key) => ({ 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` }),
+    body: (prompt) => JSON.stringify({ model: 'gpt-4o-mini', max_tokens: 16, messages: [{ role: 'user', content: prompt }] }),
+    extract: (data) => data.choices?.[0]?.message?.content?.trim()
+  },
+  gemini: {
+    url: (key) => `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+    headers: () => ({ 'Content-Type': 'application/json' }),
+    body: (prompt) => JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+    extract: (data) => data.candidates?.[0]?.content?.parts?.[0]?.text?.trim()
+  },
+  custom: {
+    url: () => document.getElementById('customEndpointInput')?.value?.trim() || '',
+    headers: (key) => { const h = { 'Content-Type': 'application/json' }; if (key) h['Authorization'] = `Bearer ${key}`; return h; },
+    body: (prompt) => {
+      const model = document.getElementById('customModelInput')?.value?.trim() || 'gpt-4o-mini';
+      return JSON.stringify({ model, max_tokens: 16, messages: [{ role: 'user', content: prompt }] });
+    },
+    extract: (data) => data.choices?.[0]?.message?.content?.trim() || data.content?.[0]?.text?.trim()
+  }
+};
+
+function onProviderChange() {
+  const p = document.getElementById('providerSelect').value;
+  document.getElementById('apiKeyRow').style.display = p === 'none' ? 'none' : 'block';
+  document.getElementById('customEndpointRow').style.display = p === 'custom' ? 'block' : 'none';
+  document.getElementById('noApiNote').style.display = p === 'none' ? 'block' : 'none';
+  const labels = {
+    anthropic: 'API Key (leave blank in Claude.ai)',
+    openai: 'OpenAI API Key (sk-...)',
+    gemini: 'Google AI API Key',
+    custom: 'API Key (if required)'
+  };
+  if (labels[p]) document.getElementById('apiKeyLabel').textContent = labels[p];
+}
+
+// ===================================================
+// PeerJS P2P CONNECTION
+// ===================================================
+let peer = null, dc = null;
+let isHost = false;
+let myName = 'Player 1', opponentNameStr = 'Opponent';
+
+function generateRoomCode() {
+  myName = document.getElementById('playerNameInput').value.trim() || 'Player 1';
+  document.getElementById('generateBtn').disabled = true;
+  document.getElementById('genStatus').textContent = 'Connecting to relay...';
+  document.getElementById('genDot').className = 'status-dot dot-waiting';
+
+  if (peer) { peer.destroy(); peer = null; }
+
+  peer = new Peer({
+    config: {
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' },
+        { urls: 'stun:global.stun.twilio.com:3478' }
+      ]
+    }
+  });
+
+  peer.on('open', id => {
+    isHost = true;
+    myPeerId = id;
+    document.getElementById('myTokenDisplay').textContent = id;
+    document.getElementById('genStatus').textContent = 'Share this code — click to copy';
+    document.getElementById('genDot').className = 'status-dot dot-connected';
+    document.getElementById('connectBtn').disabled = false;
+  });
+
+  // Host waits for incoming connection
+  peer.on('connection', conn => {
+    dc = conn;
+    setupDataChannel(conn);
+  });
+
+  peer.on('error', err => {
+    document.getElementById('genStatus').textContent = 'Error: ' + err.message;
+    document.getElementById('genDot').className = 'status-dot dot-waiting';
+    document.getElementById('generateBtn').disabled = false;
+  });
+}
+
+function connectToRoom() {
+  const code = document.getElementById('peerTokenInput').value.trim();
+  if (!code) return;
+
+  myName = document.getElementById('playerNameInput').value.trim() || 'Player 2';
+  document.getElementById('connectBtn').disabled = true;
+  document.getElementById('connDot').className = 'status-dot dot-waiting';
+  document.getElementById('connStatus').textContent = 'Connecting...';
+
+  const doConnect = () => {
+    const conn = peer.connect(code, { reliable: true, serialization: 'json' });
+    dc = conn;
+    setupDataChannel(conn);
+    conn.on('error', err => {
+      document.getElementById('connStatus').textContent = 'Failed: ' + err.message;
+      document.getElementById('connDot').className = 'status-dot dot-waiting';
+      document.getElementById('connectBtn').disabled = false;
+    });
+  };
+
+  if (!peer) {
+    peer = new Peer({
+      config: {
+        iceServers: [
+          { urls: 'stun:stun.l.google.com:19302' },
+          { urls: 'stun:stun1.l.google.com:19302' }
+        ]
+      }
+    });
+    peer.on('open', id => { myPeerId = id; doConnect(); });
+    peer.on('error', err => {
+      document.getElementById('connStatus').textContent = 'Error: ' + err.message;
+      document.getElementById('connectBtn').disabled = false;
+    });
+  } else if (peer.open) {
+    doConnect();
+  } else {
+    peer.on('open', doConnect);
+  }
+}
+
+function setupDataChannel(conn) {
+  conn.on('open', () => {
+    document.getElementById('connDot').className = 'status-dot dot-connected';
+    document.getElementById('connStatus').textContent = 'Connected!';
+    onConnected();
+    send({ type: 'hello', name: myName, peerId: myPeerId });
+  });
+  conn.on('data', msg => handleMessage(msg));
+  conn.on('close', () => {
+    addLog('Opponent disconnected', 'log-system');
+    showDisconnectToast();
+  });
+  conn.on('error', e => addLog('Connection error: ' + (e.message||e), 'log-system'));
+}
+
+function showDisconnectToast() {
+  const toast = document.getElementById('disconnectToast');
+  toast.style.display = 'block';
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transition = 'opacity 0.5s';
+    setTimeout(() => { toast.style.display = 'none'; toast.style.opacity = ''; toast.style.transition = ''; }, 500);
+  }, 4000);
+}
+
+function send(msg) {
+  if (dc && dc.open) dc.send(msg);
+}
+
+function onConnected() {
+  document.getElementById('overlay').style.display = 'none';
+  document.getElementById('app').style.display = 'grid';
+  document.getElementById('playerName').textContent = myName;
+  document.getElementById('topbarPlayer').textContent = myName;
+  document.getElementById('topbarOpponent').textContent = opponentNameStr;
+  document.getElementById('opponentName').textContent = opponentNameStr;
+  document.getElementById('myDisplayName').value = myName;
+  document.getElementById('opponentChatName').textContent = opponentNameStr;
+
+  document.getElementById('dealBtn').disabled = !isHost;
+  addLog('Connected to ' + opponentNameStr, 'log-system');
+
+  // Init encryption and broadcast our profile (no _sentPubkey guard — always send on connect)
+  initEncryption().then(() => {
+    broadcastProfile();
+  });
+}
+
+function handleMessage(msg) {
+  switch (msg.type) {
+    case 'hello':
+      opponentNameStr = msg.name || 'Opponent';
+      if (msg.peerId) opponentPeerId = msg.peerId;
+      document.getElementById('opponentName').textContent = opponentNameStr;
+      document.getElementById('topbarOpponent').textContent = opponentNameStr;
+      break;
+    case 'game_state':
+      applyGameState(msg.state, true);
+      break;
+    case 'action':
+      handleOpponentAction(msg.action, msg.amount);
+      break;
+    case 'request_deal':
+      // Non-host requested a new hand — only host starts it
+      if (isHost) startNewHand();
+      break;
+    case 'stake_add':
+      receiveOpponentStake(msg.stake);
+      break;
+    case 'stake_buy':
+      handleStakeBuy(msg.stakeId, msg.createdBy, msg.side);
+      break;
+    // Negotiation messages
+    case 'stake_negotiate':
+      receiveNegotiationProposal(msg);
+      break;
+    case 'stake_neg_counter':
+      receiveNegotiationCounter(msg);
+      break;
+    case 'stake_neg_accept': {
+      const agreedCoins = negotiation.myOffer;
+      const agreedDesc = negotiation.desc;
+      finaliseNegotiatedStake(agreedDesc, agreedCoins);
+      addLog('Stake agreed: "' + agreedDesc + '" for ' + agreedCoins + ' coins', 'log-win');
+      closeNegotiation();
+      break;
+    }
+    case 'stake_neg_decline':
+      addLog('Opponent declined stake negotiation', 'log-system');
+      closeNegotiation();
+      break;
+    case 'chat_msg':
+      receiveChat(msg);
+      break;
+    case 'chat_img_chunk':
+      receiveChatChunk(msg);
+      break;
+    case 'profile_update':
+      receiveProfile(msg);
+      break;
+    case 'profile_avatar_chunk':
+      receiveAvatarChunk(msg);
+      break;
+  }
+}
+
+function showOverlay() {
+  if (peer) { peer.destroy(); peer = null; dc = null; }
+  document.getElementById('overlay').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('myTokenDisplay').textContent = 'Click above to get your room code';
+  document.getElementById('genStatus').textContent = 'Not connected to relay yet';
+  document.getElementById('genDot').className = 'status-dot dot-waiting';
+  document.getElementById('connDot').className = 'status-dot dot-waiting';
+  document.getElementById('connStatus').textContent = 'Enter a room code to connect';
+  document.getElementById('connectBtn').disabled = true;
+  document.getElementById('generateBtn').disabled = false;
+  document.getElementById('peerTokenInput').value = '';
+  isHost = false;
+  resetGame();
+}
+
+function copyToken() {
+  const t = document.getElementById('myTokenDisplay').textContent;
+  const skip = ['Click above to get your room code', 'Connecting to relay...'];
+  if (t && !skip.includes(t)) {
+    navigator.clipboard.writeText(t).then(() => {
+      document.getElementById('genStatus').textContent = '✓ Copied!';
+      setTimeout(() => document.getElementById('genStatus').textContent = 'Share this code — click to copy', 1500);
+    });
+  }
+}
+
+// Enable connect button when code typed
+document.getElementById('peerTokenInput').addEventListener('input', function() {
+  document.getElementById('connectBtn').disabled = !this.value.trim();
+});
+
+
+
+// ===================================================
+// POKER ENGINE — Texas Hold'em
+// ===================================================
+const SUITS = ['♠','♥','♦','♣'];
+const SUIT_CLASSES = ['black','red','red','black'];
+const VALUES = ['','','2','3','4','5','6','7','8','9','10','J','Q','K','A'];
+
+let gameState = {
+  phase: 'waiting', // waiting, pre_flop, flop, turn, river, showdown
+  deck: [],
+  myCards: [],
+  opponentCards: [],
+  community: [],
+  pot: 0,
+  myBet: 0,
+  opponentBet: 0,
+  myChips: 500,
+  opponentChips: 500,
+  myTurn: false,
+  dealerIsMe: true,
+  smallBlind: 5, bigBlind: 10,
+  lastRaise: 0,
+  myFolded: false,
+  opponentFolded: false,
+  myActedThisRound: false,   // has current player acted this betting round?
+  oppActedThisRound: false   // has opponent acted this betting round?
+};
+
+// myCoins removed — use gameState.myChips throughout
+let allStakes = []; // {id, description, coins, createdBy} — createdBy is peer ID
+let myPeerId = null;  // set when peer opens
+let opponentPeerId = null;
+let pendingStake = null;
+
+function createDeck() {
+  const deck = [];
+  for (let s = 0; s < 4; s++)
+    for (let v = 2; v <= 14; v++)
+      deck.push({ v, s });
+  return deck;
+}
+
+function shuffle(deck) {
+  // Standard Fisher-Yates
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [deck[i], deck[j]] = [deck[j], deck[i]];
+  }
+
+  if (window.rigEnabled) {
+    // Full rig: give player a strong starting hand (two high cards or a pocket pair)
+    // Find two high cards (J, Q, K, A) from the deck and swap them into player hole card slots (0 and 2)
+    const highCards = [];
+    for (let i = 4; i < deck.length && highCards.length < 2; i++) {
+      if (deck[i].v >= 11) highCards.push(i); // J+ 
+    }
+    if (highCards.length === 2) {
+      [deck[0], deck[highCards[0]]] = [deck[highCards[0]], deck[0]];
+      [deck[2], deck[highCards[1]]] = [deck[highCards[1]], deck[2]];
+    } else if (highCards.length === 1) {
+      [deck[0], deck[highCards[0]]] = [deck[highCards[0]], deck[0]];
+      // Find any card >= 9 for second slot
+      const midIdx = deck.findIndex((c, i) => i >= 4 && c.v >= 9);
+      if (midIdx >= 4) [deck[2], deck[midIdx]] = [deck[midIdx], deck[2]];
+    }
+    // Optionally give matching suits for flush potential (30% chance)
+    if (Math.random() < 0.3 && deck[0].v >= 11 && deck[2].v >= 9) {
+      deck[2] = { v: deck[2].v, s: deck[0].s }; // match suit
+    }
+  }
+
+  return deck;
+}
+
+function requestDeal() {
+  if (isHost) {
+    startNewHand();
+  } else {
+    // Non-host requests the host to deal
+    send({ type: 'request_deal' });
+    document.getElementById('dealBtn').disabled = true;
+    setMessage('Requesting new hand...');
+    addLog('Deal requested — waiting for host...', 'log-system');
+  }
+}
+
+function startNewHand() {
+  resetGameVisuals();
+  // Hide deal button immediately after dealing
+  document.getElementById('dealBtn').style.display = 'none';
+  const deck = shuffle(createDeck());
+
+  const state = {
+    phase: 'pre_flop',
+    deck: deck,
+    myCards: [deck[0], deck[2]],
+    opponentCards: [deck[1], deck[3]],
+    community: [],
+    pot: gameState.bigBlind + gameState.smallBlind,
+    myBet: gameState.dealerIsMe ? gameState.smallBlind : gameState.bigBlind,
+    opponentBet: gameState.dealerIsMe ? gameState.bigBlind : gameState.smallBlind,
+    myChips: gameState.myChips - (gameState.dealerIsMe ? gameState.smallBlind : gameState.bigBlind),
+    opponentChips: gameState.opponentChips - (gameState.dealerIsMe ? gameState.bigBlind : gameState.smallBlind),
+    myTurn: gameState.dealerIsMe, // small blind acts first post-flop, big blind first pre
+    dealerIsMe: gameState.dealerIsMe,
+    smallBlind: gameState.smallBlind,
+    bigBlind: gameState.bigBlind,
+    lastRaise: gameState.bigBlind,
+    myFolded: false,
+    opponentFolded: false,
+    myActedThisRound: false,
+    oppActedThisRound: false
+  };
+
+  // Pre-flop: big blind acts last, so non-dealer (big blind) waits
+  // Actually pre-flop action starts to left of big blind
+  state.myTurn = state.dealerIsMe; // dealer is small blind, so opponent (big blind) goes last, dealer (SB) goes first
+
+  applyGameState(state, false);
+  send({ type: 'game_state', state });
+  addLog('New hand dealt', 'log-system');
+}
+
+function applyGameState(state, fromNetwork) {
+  const prevPhase = gameState.phase;
+  // When receiving state from the other player (network), swap perspective so
+  // each player always sees themselves as "my" side regardless of host/non-host role.
+  if (fromNetwork && state.myCards && state.opponentCards) {
+    state = { ...state, myCards: state.opponentCards, opponentCards: state.myCards,
+      myBet: state.opponentBet, opponentBet: state.myBet,
+      myChips: state.opponentChips, opponentChips: state.myChips,
+      myTurn: !state.myTurn, dealerIsMe: !state.dealerIsMe,
+      myActedThisRound: state.oppActedThisRound !== undefined ? state.oppActedThisRound : false,
+      oppActedThisRound: state.myActedThisRound !== undefined ? state.myActedThisRound : false };
+  }
+  gameState = { ...gameState, ...state };
+
+  // Auto-dismiss result overlay when a new hand starts (received from network)
+  if (fromNetwork && state.phase === 'pre_flop' && prevPhase !== 'pre_flop') {
+    const box = document.getElementById('handResult');
+    if (box.style.display !== 'none') hideResult();
+    resetGameVisuals();
+  }
+
+  renderTable();
+
+  // Only run showdown logic if received from network (not triggered locally)
+  if (state.phase === 'showdown' && fromNetwork) {
+    doShowdown();
+  } else if (state.myTurn && state.phase !== 'waiting') {
+    enableActions();
+  } else {
+    disableActions();
+    if (state.phase !== 'waiting') setMessage('Waiting for opponent...');
+  }
+
+  if (state.phase !== prevPhase && state.phase !== 'waiting') {
+    addLog('Phase: ' + state.phase.replace('_',' '), 'log-action');
+  }
+}
+
+function renderTable() {
+  const gs = gameState;
+  // Phase
+  const phaseNames = { pre_flop:'Pre-Flop', flop:'Flop', turn:'Turn', river:'River', showdown:'Showdown', waiting:'Waiting' };
+  document.getElementById('phaseLabel').textContent = phaseNames[gs.phase] || gs.phase;
+
+  // Pot
+  document.getElementById('potValue').textContent = gs.pot;
+  document.getElementById('myBetValue').textContent = gs.myBet;
+  document.getElementById('oppBetValue').textContent = gs.opponentBet;
+
+  // Chips
+  document.getElementById('playerChips').textContent = gs.myChips;
+  document.getElementById('opponentChips').textContent = gs.opponentChips;
+
+  // Community cards
+  const cc = document.getElementById('communityCards');
+  cc.innerHTML = '';
+  const showCount = { waiting:0, pre_flop:0, flop:3, turn:4, river:5, showdown:5 }[gs.phase] || 0;
+  for (let i = 0; i < 5; i++) {
+    if (i < showCount && gs.community && gs.community[i]) cc.appendChild(makeCard(gs.community[i], true));
+    else { const ph = document.createElement('div'); ph.className='card-placeholder'; cc.appendChild(ph); }
+  }
+
+  // Player cards
+  const pc2 = document.getElementById('playerCards');
+  pc2.innerHTML = '';
+  if (gs.myCards && gs.myCards.length) gs.myCards.forEach(c => pc2.appendChild(makeCard(c, true)));
+  else for(let i=0;i<2;i++){const ph=document.createElement('div');ph.className='card-placeholder';pc2.appendChild(ph);}
+
+  // Opponent cards
+  const oc = document.getElementById('opponentCards');
+  oc.innerHTML = '';
+  if (gs.opponentCards && gs.opponentCards.length) {
+    gs.opponentCards.forEach(c => oc.appendChild(makeCard(c, gs.phase === 'showdown')));
+  } else for(let i=0;i<2;i++){const ph=document.createElement('div');ph.className='card-placeholder';oc.appendChild(ph);}
+
+  // Bet badges
+  const mb = document.getElementById('playerBetBadge');
+  const ob = document.getElementById('opponentBetBadge');
+  if (gs.myBet > 0) { mb.style.display='block'; mb.textContent='Bet: '+gs.myBet; }
+  else mb.style.display='none';
+  if (gs.opponentBet > 0) { ob.style.display='block'; ob.textContent='Bet: '+gs.opponentBet; }
+  else ob.style.display='none';
+}
+
+function makeCard(card, faceUp) {
+  const el = document.createElement('div');
+  el.className = 'card ' + (faceUp ? SUIT_CLASSES[card.s] : 'back');
+  if (faceUp) {
+    const valEl = document.createElement('div'); valEl.className='card-value';
+    valEl.textContent = VALUES[card.v];
+    const suitEl = document.createElement('div'); suitEl.className='card-suit';
+    suitEl.textContent = SUITS[card.s];
+    el.appendChild(valEl); el.appendChild(suitEl);
+  }
+  return el;
+}
+
+function enableActions() {
+  setMessage("Your turn to act");
+  document.getElementById('dealBtn').style.display = 'none';
+  document.getElementById('foldBtn').style.display = 'inline-flex';
+  document.getElementById('raiseArea').style.display = 'flex';
+
+  const gs = gameState;
+  const callAmount = gs.opponentBet - gs.myBet;
+
+  document.getElementById('foldBtn').disabled = false;
+  document.getElementById('raiseBtn').disabled = false;
+
+  if (callAmount <= 0) {
+    document.getElementById('checkBtn').style.display = 'inline-flex';
+    document.getElementById('callBtn').style.display = 'none';
+    document.getElementById('checkBtn').disabled = false;
+  } else {
+    document.getElementById('checkBtn').style.display = 'none';
+    document.getElementById('callBtn').style.display = 'inline-flex';
+    document.getElementById('callBtn').textContent = 'Call ' + callAmount;
+    document.getElementById('callBtn').disabled = false;
+  }
+  document.getElementById('raiseAmount').value = Math.max(gs.lastRaise * 2, gs.bigBlind);
+}
+
+function disableActions() {
+  ['foldBtn','checkBtn','callBtn','raiseBtn'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = true;
+  });
+}
+
+function showDealBtn() {
+  document.getElementById('foldBtn').style.display = 'none';
+  document.getElementById('checkBtn').style.display = 'none';
+  document.getElementById('callBtn').style.display = 'none';
+  document.getElementById('raiseArea').style.display = 'none';
+  document.getElementById('dealBtn').style.display = 'inline-flex';
+  document.getElementById('dealBtn').disabled = false;
+}
+
+function setMessage(msg) {
+  document.getElementById('gameMessage').textContent = msg;
+}
+
+function playerAction(action) {
+  const gs = gameState;
+  let amount = 0;
+
+  if (action === 'raise') {
+    amount = parseInt(document.getElementById('raiseAmount').value) || gs.bigBlind;
+  }
+
+  send({ type: 'action', action, amount });
+  processAction(action, amount, true);
+}
+
+function handleOpponentAction(action, amount) {
+  addLog(`${opponentNameStr}: ${action}${amount ? ' ' + amount : ''}`, 'log-action');
+  processAction(action, amount, false);
+}
+
+function processAction(action, amount, isMine) {
+  const gs = gameState;
+  disableActions();
+
+  if (action === 'fold') {
+    if (isMine) {
+      gs.myFolded = true;
+      // Opponent wins the pot
+      gs.opponentChips += gs.pot;
+      gs.pot = 0; gs.myBet = 0; gs.opponentBet = 0;
+      gs.dealerIsMe = !gs.dealerIsMe;
+      renderTable();
+      showHandResult(false, 'You Folded', 'Opponent wins the pot', true);
+    } else {
+      gs.opponentFolded = true;
+      // We win the pot
+      gs.myChips += gs.pot;
+      gs.pot = 0; gs.myBet = 0; gs.opponentBet = 0;
+      gs.dealerIsMe = !gs.dealerIsMe;
+      renderTable();
+      showHandResult(true, 'Opponent Folded!', 'You win the pot', false);
+    }
+    addLog((isMine ? 'You' : opponentNameStr) + ' folded', 'log-action');
+    send({ type: 'game_state', state: gs });
+    return;
+  }
+
+  if (action === 'check') {
+    addLog((isMine ? 'You' : opponentNameStr) + ' checked', 'log-action');
+    if (isMine) gs.myActedThisRound = true;
+    else gs.oppActedThisRound = true;
+    advanceOrSwitch(isMine);
+  }
+
+  if (action === 'call') {
+    const callAmt = isMine ? (gs.opponentBet - gs.myBet) : (gs.myBet - gs.opponentBet);
+    if (isMine) { gs.myBet += callAmt; gs.myChips -= callAmt; gs.myActedThisRound = true; }
+    else { gs.opponentBet += callAmt; gs.opponentChips -= callAmt; gs.oppActedThisRound = true; }
+    gs.pot += callAmt;
+    addLog((isMine ? 'You' : opponentNameStr) + ' called ' + callAmt, 'log-action');
+    advanceOrSwitch(isMine);
+  }
+
+  if (action === 'raise') {
+    if (isMine) {
+      const total = amount;
+      const extra = total - gs.myBet;
+      gs.myBet = total; gs.myChips -= extra; gs.pot += extra;
+      gs.lastRaise = total;
+      gs.myActedThisRound = true; gs.oppActedThisRound = false; // opponent must respond
+    } else {
+      const total = amount;
+      const extra = total - gs.opponentBet;
+      gs.opponentBet = total; gs.opponentChips -= extra; gs.pot += extra;
+      gs.lastRaise = total;
+      gs.oppActedThisRound = true; gs.myActedThisRound = false; // I must respond
+    }
+    addLog((isMine ? 'You' : opponentNameStr) + ' raised to ' + amount, 'log-action');
+    // Switch turn
+    gs.myTurn = !isMine;
+    renderTable();
+    if (gs.myTurn) enableActions();
+    else setMessage('Waiting for opponent...');
+  }
+
+  renderTable();
+  // Both players broadcast their game state after acting so both sides stay in sync
+  send({ type: 'game_state', state: gs });
+}
+
+function advanceOrSwitch(isMine) {
+  const gs = gameState;
+  // Bets equal AND both players have acted (catches check-check and call scenarios)
+  const betsEqual = gs.myBet === gs.opponentBet;
+  const bothActed = gs.myActedThisRound && gs.oppActedThisRound;
+  if (betsEqual && bothActed) {
+    advancePhase();
+  } else {
+    gs.myTurn = !isMine;
+    renderTable();
+    if (gs.myTurn) enableActions();
+    else setMessage('Waiting for opponent...');
+    send({ type: 'game_state', state: gs });
+  }
+}
+
+function advancePhase() {
+  const gs = gameState;
+  const phases = ['pre_flop','flop','turn','river','showdown'];
+  const idx = phases.indexOf(gs.phase);
+
+  if (idx < 0 || idx >= phases.length - 1) { doShowdown(); return; }
+
+  gs.phase = phases[idx + 1];
+  gs.myBet = 0; gs.opponentBet = 0;
+  gs.myActedThisRound = false; gs.oppActedThisRound = false;
+
+  if (gs.phase === 'flop') gs.community = gs.deck.slice(4, 7);
+  if (gs.phase === 'turn') gs.community = gs.deck.slice(4, 8);
+  if (gs.phase === 'river') gs.community = gs.deck.slice(4, 9);
+
+  if (gs.phase === 'showdown') { doShowdown(); return; }
+
+  // Post-flop: dealer acts last, so non-dealer goes first
+  gs.myTurn = !gs.dealerIsMe;
+
+  renderTable();
+  if (gs.myTurn) enableActions();
+  else setMessage('Waiting for opponent...');
+  addLog('Phase: ' + gs.phase, 'log-system');
+
+  send({ type: 'game_state', state: gs });
+}
+
+// ===================================================
+// HAND EVALUATION
+// ===================================================
+function combos5(arr) {
+  const result = [];
+  const n = arr.length;
+  for (let a=0;a<n-4;a++)
+  for (let b=a+1;b<n-3;b++)
+  for (let c=b+1;c<n-2;c++)
+  for (let d=c+1;d<n-1;d++)
+  for (let e=d+1;e<n;e++)
+    result.push([arr[a],arr[b],arr[c],arr[d],arr[e]]);
+  return result;
+}
+
+function evalFive(hand) {
+  const vals = hand.map(c=>c.v).sort((a,b)=>b-a);
+  const suits = hand.map(c=>c.s);
+  const isFlush = suits.every(s=>s===suits[0]);
+  const diffs = vals.slice(0,4).map((v,i)=>v-vals[i+1]);
+  const isStraight = diffs.every(d=>d===1) || (vals[0]===14&&vals[1]===5&&vals[2]===4&&vals[3]===3&&vals[4]===2);
+  const straightHigh = (vals[0]===14&&vals[1]===5) ? 5 : vals[0];
+
+  const freq = {};
+  vals.forEach(v=>freq[v]=(freq[v]||0)+1);
+  const counts = Object.values(freq).sort((a,b)=>b-a);
+  const byFreq = Object.entries(freq).sort((a,b)=>b[1]-a[1]||b[0]-a[0]).map(e=>parseInt(e[0]));
+
+  if (isFlush && isStraight) return { rank:8, name:'Straight Flush', key:[straightHigh,...vals] };
+  if (counts[0]===4) return { rank:7, name:'Four of a Kind', key:byFreq };
+  if (counts[0]===3&&counts[1]===2) return { rank:6, name:'Full House', key:byFreq };
+  if (isFlush) return { rank:5, name:'Flush', key:vals };
+  if (isStraight) return { rank:4, name:'Straight', key:[straightHigh,...vals] };
+  if (counts[0]===3) return { rank:3, name:'Three of a Kind', key:byFreq };
+  if (counts[0]===2&&counts[1]===2) return { rank:2, name:'Two Pair', key:byFreq };
+  if (counts[0]===2) return { rank:1, name:'One Pair', key:byFreq };
+  return { rank:0, name:'High Card', key:vals };
+}
+
+function bestHand(cards) {
+  const all5 = combos5(cards);
+  let best = null;
+  for (const combo of all5) {
+    const ev = evalFive(combo);
+    if (!best || ev.rank > best.rank || (ev.rank===best.rank && compareKeys(ev.key, best.key) > 0)) {
+      best = { ...ev, cards: combo };
+    }
+  }
+  return best;
+}
+
+function compareKeys(a, b) {
+  for (let i=0;i<Math.min(a.length,b.length);i++) if(a[i]!==b[i]) return a[i]-b[i];
+  return 0;
+}
+
+function doShowdown() {
+  const gs = gameState;
+  gs.phase = 'showdown';
+  renderTable();
+
+  const allMy = [...gs.myCards, ...(gs.community||[])];
+  const allOp = [...gs.opponentCards, ...(gs.community||[])];
+  const myBest = bestHand(allMy);
+  const opBest = bestHand(allOp);
+
+  const cmp = myBest.rank !== opBest.rank ? myBest.rank - opBest.rank : compareKeys(myBest.key, opBest.key);
+
+  // Highlight winning cards
+  setTimeout(() => {
+    if (cmp > 0) {
+      gs.myChips += gs.pot;
+      // win bonus removed — chips already awarded via pot
+      showHandResult(true, '🏆 You Win!', myBest.name + ' vs ' + opBest.name, false);
+      addLog('You won ' + gs.pot + ' chips with ' + myBest.name, 'log-win');
+    } else if (cmp < 0) {
+      gs.opponentChips += gs.pot;
+      showHandResult(false, '💀 You Lose', opBest.name + ' beats ' + myBest.name, false);
+      addLog('Opponent won with ' + opBest.name, 'log-action');
+    } else {
+      const half = Math.floor(gs.pot/2);
+      gs.myChips += half; gs.opponentChips += half;
+      showHandResult(null, '🤝 Split Pot', myBest.name, false);
+      addLog('Split pot — ' + myBest.name, 'log-system');
+    }
+    gs.pot = 0; gs.myBet = 0; gs.opponentBet = 0;
+    gs.dealerIsMe = !gs.dealerIsMe;
+    renderTable();
+  }, 600);
+}
+
+function showHandResult(win, title, hand, skipDelay) {
+  const box = document.getElementById('handResult');
+  document.getElementById('resultTitle').textContent = title;
+  document.getElementById('resultHand').textContent = hand;
+  box.style.display = 'flex';
+  const btn = box.querySelector('button');
+  btn.textContent = 'Deal Again';
+  btn.style.display = 'inline-flex';
+  btn.disabled = false;
+  btn.style.opacity = '';
+}
+
+function hideResult() {
+  const box = document.getElementById('handResult');
+  box.style.display = 'none';
+  const btn = box.querySelector('button');
+  btn.style.display = 'inline-flex';
+  btn.disabled = false;
+  btn.style.opacity = '';
+  btn.textContent = 'Deal Again';
+  showDealBtn();
+  gameState.phase = 'waiting';
+  setMessage('Ready for next hand');
+}
+
+function resetGame() {
+  gameState = {
+    phase:'waiting', deck:[], myCards:[], opponentCards:[], community:[],
+    pot:0, myBet:0, opponentBet:0, myChips:500, opponentChips:500,
+    myTurn:false, dealerIsMe:true, smallBlind:5, bigBlind:10,
+    lastRaise:10, myFolded:false, opponentFolded:false,
+    myActedThisRound:false, oppActedThisRound:false
+  };
+}
+
+function resetGameVisuals() {
+  document.getElementById('handResult').style.display = 'none';
+  document.getElementById('playerCards').innerHTML = '';
+  document.getElementById('opponentCards').innerHTML = '';
+  document.getElementById('communityCards').innerHTML = '';
+  gameState.myFolded = false; gameState.opponentFolded = false;
+  gameState.lastRaise = gameState.bigBlind;
+  gameState.myActedThisRound = false; gameState.oppActedThisRound = false;
+  disableActions();
+  document.getElementById('foldBtn').style.display = 'none';
+  document.getElementById('checkBtn').style.display = 'none';
+  document.getElementById('callBtn').style.display = 'none';
+  document.getElementById('raiseArea').style.display = 'none';
+}
+
+// ===================================================
+// STAKES NEGOTIATION SYSTEM
+// ===================================================
+let pendingNegDesc = '';
+let negotiation = { active: false, id: null, desc: '', myOffer: 0, theirOffer: 0, round: 0, iAmProposer: false };
+let negIdCounter = 0;
+
+function openNegotiationAsProposer(desc, defaultCoins) {
+  // Show panel as proposer side (setting initial offer)
+  document.getElementById('negotiationPanel').style.display = 'block';
+  document.getElementById('negDesc').textContent = '"' + desc + '"';
+  document.getElementById('negTheirOffer').textContent = 'Set your proposed coin value:';
+  document.getElementById('negRoundLabel').textContent = 'New Proposal';
+  document.getElementById('negCounterArea').style.display = 'block';
+  document.getElementById('negSlider').value = defaultCoins;
+  document.getElementById('negSliderVal').textContent = defaultCoins + ' coins';
+  document.getElementById('negSuggestArea').style.display = 'none';
+  document.getElementById('negAcceptBtn').style.display = 'none';
+  document.getElementById('negCounterBtn').style.display = 'none';
+  document.getElementById('negSendCounterBtn').style.display = 'inline-flex';
+  document.getElementById('negSendCounterBtn').textContent = '⟡ Propose to Opponent';
+  document.getElementById('negSendCounterBtn').onclick = proposeStakeToOpponent;
+  document.getElementById('negDeclineBtn').style.display = 'none';
+  document.getElementById('negStatus').textContent = 'Adjust coins and send your proposal';
+  switchTab('stakes');
+}
+
+function proposeStakeToOpponent() {
+  const desc = pendingNegDesc || document.getElementById('stakeInput').value.trim();
+  const coins = parseInt(document.getElementById('negSlider').value) || 50;
+  if (!desc) return;
+
+  const id = ++negIdCounter;
+  negotiation = { active: true, id, desc, myOffer: coins, theirOffer: 0, round: 1, iAmProposer: true };
+
+  send({ type: 'stake_negotiate', negotiationId: id, desc, coins, round: 1 });
+  addLog('Proposed stake: "' + desc + '" for ' + coins + ' coins', 'log-system');
+
+  // Update panel to waiting state
+  document.getElementById('negTheirOffer').textContent = 'Waiting for opponent response...';
+  document.getElementById('negCounterArea').style.display = 'none';
+  document.getElementById('negSendCounterBtn').style.display = 'none';
+  document.getElementById('negStatus').textContent = 'Proposal sent — round 1/3';
+}
+
+function receiveNegotiationProposal(msg) {
+  // We are the receiver of a proposal
+  negotiation = { active: true, id: msg.negotiationId, desc: msg.desc, myOffer: 0, theirOffer: msg.coins, round: msg.round, iAmProposer: false };
+
+  document.getElementById('negotiationPanel').style.display = 'block';
+  document.getElementById('negDesc').textContent = '"' + msg.desc + '"';
+  document.getElementById('negTheirOffer').textContent = opponentNameStr + ' proposes: ' + msg.coins + ' coins';
+  document.getElementById('negRoundLabel').textContent = 'Round ' + msg.round + '/3';
+  document.getElementById('negCounterArea').style.display = 'none';
+  document.getElementById('negSuggestArea').style.display = 'none';
+  document.getElementById('negAcceptBtn').style.display = 'inline-flex';
+  document.getElementById('negCounterBtn').style.display = msg.round < 3 ? 'inline-flex' : 'none';
+  document.getElementById('negSendCounterBtn').style.display = 'none';
+  document.getElementById('negDeclineBtn').style.display = msg.round >= 3 ? 'inline-flex' : 'none';
+  document.getElementById('negStatus').textContent = 'Respond to opponent\'s proposal';
+
+  addLog(opponentNameStr + ' proposed stake "' + msg.desc + '" for ' + msg.coins + ' coins', 'log-system');
+  switchTab('stakes');
+}
+
+function receiveNegotiationCounter(msg) {
+  // We (proposer) receive a counter-offer
+  negotiation.theirOffer = msg.coins;
+  negotiation.round = msg.round;
+
+  if (msg.isFinalSuggest) {
+    // System suggested midpoint — show special UI
+    document.getElementById('negRoundLabel').textContent = 'Final Suggestion';
+    document.getElementById('negTheirOffer').textContent = 'No consensus reached';
+    document.getElementById('negSuggestArea').style.display = 'block';
+    document.getElementById('negSuggestVal').textContent = msg.coins + ' coins';
+    document.getElementById('negCounterArea').style.display = 'none';
+    document.getElementById('negAcceptBtn').style.display = 'inline-flex';
+    document.getElementById('negCounterBtn').style.display = 'none';
+    document.getElementById('negSendCounterBtn').style.display = 'none';
+    document.getElementById('negDeclineBtn').style.display = 'inline-flex';
+    document.getElementById('negStatus').textContent = 'Accept the suggested amount or decline to start fresh';
+    addLog('System suggests ' + msg.coins + ' coins for "' + negotiation.desc + '"', 'log-system');
+    return;
+  }
+
+  document.getElementById('negTheirOffer').textContent = opponentNameStr + ' counters: ' + msg.coins + ' coins';
+  document.getElementById('negRoundLabel').textContent = 'Round ' + msg.round + '/3';
+  document.getElementById('negSuggestArea').style.display = 'none';
+  document.getElementById('negAcceptBtn').style.display = 'inline-flex';
+  document.getElementById('negCounterArea').style.display = 'none';
+  document.getElementById('negCounterBtn').style.display = msg.round < 3 ? 'inline-flex' : 'none';
+  document.getElementById('negSendCounterBtn').style.display = 'none';
+  document.getElementById('negDeclineBtn').style.display = msg.round >= 3 ? 'inline-flex' : 'none';
+  document.getElementById('negStatus').textContent = 'Respond to counter-offer';
+  addLog(opponentNameStr + ' countered with ' + msg.coins + ' coins', 'log-system');
+  switchTab('stakes');
+}
+
+function negSliderUpdate() {
+  const v = document.getElementById('negSlider').value;
+  document.getElementById('negSliderVal').textContent = v + ' coins';
+}
+
+function negAccept() {
+  if (!negotiation.active) return;
+  const agreedCoins = negotiation.theirOffer || negotiation.myOffer;
+  const desc = negotiation.desc;
+
+  send({ type: 'stake_neg_accept', negotiationId: negotiation.id });
+
+  // Both add the stake
+  finaliseNegotiatedStake(desc, agreedCoins);
+  addLog('Stake agreed: "' + desc + '" for ' + agreedCoins + ' coins', 'log-win');
+  closeNegotiation();
+}
+
+function negShowCounter() {
+  document.getElementById('negCounterArea').style.display = 'block';
+  document.getElementById('negSlider').value = Math.round((negotiation.myOffer + negotiation.theirOffer) / 2) || 50;
+  negSliderUpdate();
+  document.getElementById('negSendCounterBtn').style.display = 'inline-flex';
+  document.getElementById('negSendCounterBtn').textContent = 'Send Counter';
+  document.getElementById('negSendCounterBtn').onclick = negSendCounter;
+  document.getElementById('negCounterBtn').style.display = 'none';
+}
+
+function negSendCounter() {
+  const coins = parseInt(document.getElementById('negSlider').value) || 50;
+  const nextRound = negotiation.round + 1;
+  negotiation.myOffer = coins;
+  negotiation.round = nextRound;
+
+  if (nextRound > 3) {
+    // Suggest midpoint
+    const mid = Math.round((coins + negotiation.theirOffer) / 2);
+    send({ type: 'stake_neg_counter', negotiationId: negotiation.id, coins: mid, round: nextRound, isFinalSuggest: true });
+    receiveNegotiationCounter({ coins: mid, round: nextRound, isFinalSuggest: true });
+  } else {
+    send({ type: 'stake_neg_counter', negotiationId: negotiation.id, coins, round: nextRound });
+    document.getElementById('negTheirOffer').textContent = 'Counter sent — waiting for opponent...';
+    document.getElementById('negCounterArea').style.display = 'none';
+    document.getElementById('negSendCounterBtn').style.display = 'none';
+    document.getElementById('negStatus').textContent = 'Counter sent — round ' + nextRound + '/3';
+  }
+}
+
+function negDecline() {
+  send({ type: 'stake_neg_decline', negotiationId: negotiation.id });
+  addLog('Stake negotiation declined — propose new stakes', 'log-system');
+  closeNegotiation();
+  document.getElementById('stakeInput').value = '';
+}
+
+function finaliseNegotiatedStake(desc, coins) {
+  const stake = { id: ++stakeIdCounter, description: desc, coins, createdBy: myPeerId || 'me' };
+  allStakes.push(stake);
+  gameState.myChips += coins;
+  renderTable();
+  renderStakes();
+  addLog('&#10022; Stake agreed: +' + coins + ' chips added to your stack', 'log-win');
+}
+
+function closeNegotiation() {
+  negotiation = { active: false, id: null, desc: '', myOffer: 0, theirOffer: 0, round: 0, iAmProposer: false };
+  document.getElementById('negotiationPanel').style.display = 'none';
+  document.getElementById('stakeInput').value = '';
+  document.getElementById('stakeCoinsPreview').textContent = '— coins';
+  document.getElementById('evalStatus').textContent = '';
+  document.getElementById('submitStakeBtn').disabled = true;
+  document.getElementById('submitStakeBtn').textContent = 'Submit';
+  document.getElementById('submitStakeBtn').onclick = submitStake;
+}
+
+// ===================================================
+// RIG FUNCTION — console: rig() / rig(false)
+// ===================================================
+window.rigEnabled = false;
+
+/**
+ * Activates subtle variance assist — call rig() to enable, rig(false) to disable.
+ * When active, deal logic slightly favours your hole cards.
+ */
+window.rig = function(enable = true) {
+  window.rigEnabled = (enable !== false);
+  const on = window.rigEnabled;
+  console.log(
+    `%c[StakePoker] Variance assist: ${on ? 'ON 🎲' : 'OFF ✓'}`,
+    `background:${on?'#1a1a00':'#001a00'};color:${on?'#c9a84c':'#27ae60'};font-weight:bold;font-size:13px;padding:4px 8px;border-radius:4px`
+  );
+  if (on) console.log('%c  Cards will slightly favour you. Use rig(false) to restore fairness.', 'color:#8aab96;font-size:11px');
+  return on ? 'Variance assist ON' : 'Variance assist OFF — fair play restored';
+};
+
+// ===================================================
+// TABLE SPEECH BUBBLES
+// ===================================================
+let _oppBubbleTimer = null;
+let _myBubbleTimer = null;
+
+function showTableBubble(zone, text, isImage, isMe) {
+  const el = document.getElementById(zone);
+  if (!el) return;
+
+  // Clear any existing bubble
+  el.innerHTML = '';
+  const timer = isMe ? '_myBubbleTimer' : '_oppBubbleTimer';
+  if (window[timer]) clearTimeout(window[timer]);
+
+  const bubble = document.createElement('div');
+  bubble.className = 'table-speech-bubble' + (isMe ? ' mine' : '');
+
+  if (isImage) {
+    bubble.innerHTML = '<span class="bubble-img-label">📷 Image</span>';
+  } else {
+    bubble.textContent = text.length > 60 ? text.slice(0, 57) + '…' : text;
+  }
+
+  // Click to dismiss
+  bubble.onclick = () => {
+    bubble.classList.add('fade-out');
+    setTimeout(() => el.innerHTML = '', 350);
+    clearTimeout(window[timer]);
+  };
+
+  el.appendChild(bubble);
+
+  // Auto-dismiss after 4s + 0.5s per 10 chars for text
+  const delay = isImage ? 4000 : Math.min(4000 + text.length * 50, 9000);
+  window[timer] = setTimeout(() => {
+    if (el.contains(bubble)) {
+      bubble.classList.add('fade-out');
+      setTimeout(() => { if (el.contains(bubble)) el.removeChild(bubble); }, 350);
+    }
+  }, delay);
+}
+let pendingCoins = 0;
+let stakeIdCounter = 0;
+
+async function evaluateStake() {
+  const desc = document.getElementById('stakeInput').value.trim();
+  if (!desc) return;
+
+  const provider = document.getElementById('providerSelect')?.value || 'anthropic';
+
+  // No-API path: open negotiation flow
+  if (provider === 'none') {
+    pendingCoins = 50;
+    pendingNegDesc = desc;
+    document.getElementById('evalStatus').textContent = 'Set a coin value and propose to your opponent';
+    document.getElementById('stakeCoinsPreview').textContent = '50 coins';
+    document.getElementById('submitStakeBtn').disabled = false;
+    document.getElementById('submitStakeBtn').textContent = '⟡ Propose';
+    document.getElementById('submitStakeBtn').onclick = proposeStakeToOpponent;
+    // Show a quick inline slider
+    openNegotiationAsProposer(desc, 50);
+    return;
+  }
+
+  // Reset button state
+  document.getElementById('submitStakeBtn').textContent = 'Submit';
+  document.getElementById('submitStakeBtn').onclick = submitStake;
+
+  document.getElementById('evalBtn').disabled = true;
+  document.getElementById('evalStatus').textContent = 'Evaluating...';
+  document.getElementById('evalStatus').className = 'llm-thinking';
+  document.getElementById('stakeCoinsPreview').textContent = '...';
+
+  try {
+    const coins = await callLLMForStake(desc);
+    pendingCoins = coins;
+    document.getElementById('stakeCoinsPreview').textContent = coins + ' coins';
+    document.getElementById('evalStatus').textContent = 'Evaluation complete — submit to add to shop';
+    document.getElementById('evalStatus').className = '';
+    document.getElementById('submitStakeBtn').disabled = false;
+  } catch (e) {
+    // If API fails, fall back to heuristic then offer negotiation
+    if (e.message === 'no_api') {
+      document.getElementById('evalStatus').textContent = 'No provider — negotiate with opponent';
+    } else {
+      const coins = heuristicEvaluate(desc);
+      pendingCoins = coins;
+      document.getElementById('stakeCoinsPreview').textContent = coins + ' coins (estimated)';
+      document.getElementById('evalStatus').textContent = 'API unavailable — used heuristic estimate';
+      document.getElementById('submitStakeBtn').disabled = false;
+    }
+    document.getElementById('evalStatus').className = '';
+  }
+  document.getElementById('evalBtn').disabled = false;
+}
+
+async function callLLMForStake(description) {
+  const provider = document.getElementById('providerSelect')?.value || 'anthropic';
+  if (provider === 'none') throw new Error('no_api');
+
+  const apiKey = document.getElementById('apiKeyInput')?.value?.trim() || '';
+  const cfg = AI_PROVIDER_CONFIG[provider];
+  if (!cfg) throw new Error('Unknown provider');
+
+  const prompt = `You are evaluating a personal stake/favour for a game economy where coins represent effort and value.
+A player has described this action or promise: "${description}"
+
+Rate it from 5 to 500 coins based on:
+- Time required (more time = more coins)
+- Effort/skill involved
+- Specificity (vague claims = fewer coins)
+- Real-world value/impact
+
+Reply with ONLY a single integer number, nothing else. No explanation, no units, just the number.`;
+
+  const endpoint = typeof cfg.url === 'function' ? cfg.url(apiKey) : cfg.url;
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: cfg.headers(apiKey),
+    body: cfg.body(prompt)
+  });
+
+  if (!response.ok) {
+    return heuristicEvaluate(description);
+  }
+
+  const data = await response.json();
+  const text = cfg.extract(data) || '';
+  const coins = parseInt(text.match(/\d+/)?.[0]);
+  return isNaN(coins) ? heuristicEvaluate(description) : Math.min(Math.max(coins, 5), 500);
+}
+
+function heuristicEvaluate(desc) {
+  const words = desc.toLowerCase().split(/\s+/);
+  let score = 20;
+  const highEffort = ['built','cooked','made','cleaned','fixed','wrote','designed','painted','repaired','taught'];
+  const medEffort = ['walked','helped','drove','bought','picked','delivered','ran'];
+  const lowEffort = ['said','told','called','texted','messaged'];
+  if (highEffort.some(w => words.includes(w))) score += 60;
+  else if (medEffort.some(w => words.includes(w))) score += 30;
+  else if (lowEffort.some(w => words.includes(w))) score += 5;
+  if (words.length > 8) score += 15;
+  return Math.min(score, 200);
+}
+
+function submitStake() {
+  const desc = document.getElementById('stakeInput').value.trim();
+  if (!desc || pendingCoins === 0) return;
+
+  const stake = {
+    id: ++stakeIdCounter,
+    description: desc,
+    coins: pendingCoins,
+    createdBy: myPeerId || 'me'
+  };
+
+  allStakes.push(stake);
+  renderStakes();
+
+  // Broadcast to opponent — they receive it tagged with our peerId so they know it's ours
+  send({ type: 'stake_add', stake });
+  addLog('Stake added: "' + desc + '" for ' + pendingCoins + ' coins', 'log-system');
+
+  document.getElementById('stakeInput').value = '';
+  document.getElementById('stakeCoinsPreview').textContent = '— coins';
+  document.getElementById('evalStatus').textContent = '';
+  document.getElementById('submitStakeBtn').disabled = true;
+  pendingCoins = 0;
+}
+
+function receiveOpponentStake(stake) {
+  // Only add if we don't already have it (avoid duplicates)
+  if (!allStakes.find(s => s.id === stake.id && s.createdBy === stake.createdBy)) {
+    allStakes.push(stake);
+    renderStakes();
+    addLog('Opponent added stake: "' + stake.description + '" (' + stake.coins + ' coins)', 'log-system');
+  }
+}
+
+function renderStakes() {
+  renderMyStakes();
+  renderTheirStakes();
+}
+
+function renderMyStakes() {
+  const el = document.getElementById('myStakesList');
+  const mine = allStakes.filter(s => s.createdBy === (myPeerId || 'me'));
+  if (!mine.length) { el.innerHTML = '<div class="empty-state">No stakes committed yet</div>'; return; }
+  el.innerHTML = mine.map(s => `
+    <div class="stake-card">
+      <div class="stake-description">${s.description}</div>
+      <div class="stake-footer">
+        <div class="stake-coins">&#127920; ${s.coins} chips</div>
+        <div class="stake-actions">
+          <button class="mini-btn mini-btn-buyback" onclick="buybackMyStake(${s.id})" title="Buy back your commitment for ${s.coins * 2} chips">
+            Buyback (${s.coins * 2} chips)
+          </button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function renderTheirStakes() {
+  const el = document.getElementById('theirStakesList');
+  const theirs = allStakes.filter(s => s.createdBy !== (myPeerId || 'me'));
+  if (!theirs.length) { el.innerHTML = '<div class="empty-state">No opponent stakes available</div>'; return; }
+  el.innerHTML = theirs.map(s => `
+    <div class="stake-card">
+      <div class="stake-description">${s.description}</div>
+      <div class="stake-footer">
+        <div class="stake-coins">&#127920; ${s.coins} chips</div>
+        <div class="stake-actions">
+          <button class="mini-btn mini-btn-buy" onclick="buyOpponentStake(${s.id})">
+            Buy (${s.coins} chips)
+          </button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function buybackMyStake(id) {
+  const stake = allStakes.find(s => s.id === id && s.createdBy === (myPeerId || 'me'));
+  if (!stake) return;
+  const cost = stake.coins * 2;
+  if (gameState.myChips < cost) { alert('Not enough chips to buy back! Need ' + cost + ' chips.'); return; }
+  if (!confirm('Buy back "' + stake.description + '" for ' + cost + ' chips? This removes it from the pool.')) return;
+  gameState.myChips -= cost;
+  allStakes = allStakes.filter(s => !(s.id === id && s.createdBy === (myPeerId || 'me')));
+  renderTable();
+  renderStakes();
+  send({ type: 'stake_buy', stakeId: id, createdBy: myPeerId || 'me', side: 'mine_buyback' });
+  addLog('You bought back "' + stake.description + '" for ' + cost + ' chips', 'log-action');
+}
+
+function buyOpponentStake(id) {
+  const stake = allStakes.find(s => s.id === id && s.createdBy !== (myPeerId || 'me'));
+  if (!stake) return;
+  const cost = stake.coins;
+  if (gameState.myChips < cost) { alert('Not enough chips! Need ' + cost + ' chips.'); return; }
+  gameState.myChips -= cost;
+  allStakes = allStakes.filter(s => !(s.id === id && s.createdBy !== (myPeerId || 'me')));
+  renderTable();
+  renderStakes();
+  send({ type: 'stake_buy', stakeId: id, createdBy: stake.createdBy, side: 'theirs' });
+  addLog('You bought "' + stake.description + '" for ' + cost + ' chips', 'log-action');
+}
+
+function handleStakeBuy(id, createdBy, side) {
+  if (side === 'mine_buyback') {
+    // Opponent bought back their own stake (which we see as "theirs")
+    allStakes = allStakes.filter(s => !(s.id === id && s.createdBy === createdBy));
+    renderStakes();
+    addLog('Opponent bought back one of their stakes', 'log-system');
+  }
+  if (side === 'theirs') {
+    // Opponent bought one of OUR stakes — we receive the sale proceeds (full coins value)
+    const stake = allStakes.find(s => s.id === id && s.createdBy === (myPeerId || 'me'));
+    if (stake) {
+      gameState.myChips += stake.coins;
+      allStakes = allStakes.filter(s => !(s.id === id && s.createdBy === (myPeerId || 'me')));
+      renderTable();
+      renderStakes();
+      addLog('Opponent bought your stake "' + stake.description + '" — +' + stake.coins + ' chips', 'log-win');
+    }
+  }
+}
+
+
+function updateCoinsDisplay() {
+  // coins display removed — chips are shown on the table player info
+}
+
+// ===================================================
+// CHAT SYSTEM — E2E encrypted via ECDH + AES-GCM
+// Images sent as separate chunked message to avoid PeerJS size limits
+// ===================================================
+let chatEncKey = null;
+let myECDHPublic = null;
+let myECDHPrivate = null;
+let pendingChatImage = null; // compressed base64 data URL
+let myAvatar = null;          // base64 data URL for my profile pic
+// Reassemble inbound image chunks: { [msgId]: { chunks:[], total, text } }
+const _imgChunks = {};
+const _pendingChunkBuffer = {}; // buffer chunks that arrive before their header
+
+async function initEncryption() {
+  try {
+    const pair = await crypto.subtle.generateKey({ name:'ECDH', namedCurve:'P-256' }, true, ['deriveKey']);
+    myECDHPrivate = pair.privateKey;
+    const pubRaw = await crypto.subtle.exportKey('raw', pair.publicKey);
+    myECDHPublic = btoa(String.fromCharCode(...new Uint8Array(pubRaw)));
+  } catch(e) { console.warn('ECDH init failed — chat uses plaintext', e); }
+}
+
+async function deriveSharedKey(theirPubB64) {
+  try {
+    const raw = Uint8Array.from(atob(theirPubB64), c => c.charCodeAt(0));
+    const theirKey = await crypto.subtle.importKey('raw', raw, { name:'ECDH', namedCurve:'P-256' }, false, []);
+    chatEncKey = await crypto.subtle.deriveKey(
+      { name:'ECDH', public: theirKey },
+      myECDHPrivate,
+      { name:'AES-GCM', length:256 },
+      false, ['encrypt','decrypt']
+    );
+  } catch(e) { chatEncKey = null; }
+}
+
+async function encryptText(str) {
+  if (!chatEncKey) return { plain: str };
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const enc = await crypto.subtle.encrypt({ name:'AES-GCM', iv }, chatEncKey,
+    new TextEncoder().encode(str));
+  return { iv: btoa(String.fromCharCode(...iv)), ct: btoa(String.fromCharCode(...new Uint8Array(enc))) };
+}
+
+async function decryptText(payload) {
+  if (payload.plain !== undefined) return payload.plain;
+  if (!chatEncKey) return null;
+  try {
+    const iv = Uint8Array.from(atob(payload.iv), c => c.charCodeAt(0));
+    const ct = Uint8Array.from(atob(payload.ct), c => c.charCodeAt(0));
+    const dec = await crypto.subtle.decrypt({ name:'AES-GCM', iv }, chatEncKey, ct);
+    return new TextDecoder().decode(dec);
+  } catch(e) { return null; }
+}
+
+// Send image in chunks of ~12KB base64 each to stay within PeerJS limits
+const CHUNK_SIZE = 12000;
+
+async function sendChatMessage() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text && !pendingChatImage) return;
+
+  const senderName = myName;
+  const imageToSend = pendingChatImage;
+
+  // Show own bubble immediately (local only)
+  appendChatBubble({ text, image: imageToSend, name: senderName, avatar: myAvatar, isMe: true });
+
+  // Send text header (encrypted) — do NOT include avatar (too large for PeerJS)
+  const msgId = Date.now() + '_' + Math.random().toString(36).slice(2);
+  const encText = await encryptText(text || '');
+  const hasImage = !!imageToSend;
+
+  send({ type: 'chat_msg', msgId, encText, hasImage, senderName });
+
+  // Send image chunks after a brief delay so header arrives first
+  if (imageToSend) {
+    const imgData = imageToSend;
+    const totalChunks = Math.ceil(imgData.length / CHUNK_SIZE);
+    // Small delay to ensure chat_msg header arrives before chunks
+    await new Promise(r => setTimeout(r, 60));
+    for (let i = 0; i < totalChunks; i++) {
+      const chunk = imgData.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+      send({ type: 'chat_img_chunk', msgId, chunk, index: i, total: totalChunks });
+      // Yield between chunks to avoid flooding PeerJS buffer
+      if (i % 5 === 4) await new Promise(r => setTimeout(r, 20));
+    }
+  }
+
+  input.value = '';
+  clearChatImage();
+}
+
+function chatKeydown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
+}
+
+async function receiveChat(msg) {
+  // Decrypt text
+  const text = await decryptText(msg.encText);
+  if (text === null) {
+    appendChatBubble({ text: '[Encrypted — key mismatch]', image: null,
+      name: opponentNameStr, avatar: _lastOppAvatar, isMe: false });
+    return;
+  }
+
+  if (!msg.hasImage) {
+    // No image — show immediately
+    appendChatBubble({ text, image: null, name: opponentNameStr, avatar: _lastOppAvatar, isMe: false });
+    // Show speech bubble on table near opponent
+    showTableBubble('oppSpeechBubbleZone', text || '', false, false);
+  } else {
+    // Reserve a bubble slot; image chunks will fill it in
+    _imgChunks[msg.msgId] = { chunks: [], total: null, text, name: opponentNameStr,
+      avatar: _lastOppAvatar, bubble: null };
+    // Append placeholder bubble now
+    const bubble = appendChatBubble({ text, image: null, name: opponentNameStr,
+      avatar: _lastOppAvatar, isMe: false, reserveId: msg.msgId });
+    _imgChunks[msg.msgId].bubble = bubble;
+    // Show image speech bubble on table
+    showTableBubble('oppSpeechBubbleZone', text || '', true, false);
+    // Drain any chunks that arrived before this header
+    if (_pendingChunkBuffer[msg.msgId]) {
+      _pendingChunkBuffer[msg.msgId].forEach(c => _applyChunk(c));
+      delete _pendingChunkBuffer[msg.msgId];
+    }
+  }
+
+  // Flash chat tab
+  const chatBtn = document.querySelectorAll('.tab-btn')[1];
+  if (chatBtn && !chatBtn.classList.contains('active')) {
+    chatBtn.style.color = 'var(--gold)';
+    setTimeout(() => { chatBtn.style.color = ''; }, 3000);
+  }
+}
+
+function receiveChatChunk(msg) {
+  // If the header hasn't arrived yet, buffer the chunk until it does
+  if (!_imgChunks[msg.msgId]) {
+    if (!_pendingChunkBuffer[msg.msgId]) _pendingChunkBuffer[msg.msgId] = [];
+    _pendingChunkBuffer[msg.msgId].push(msg);
+    return;
+  }
+  _applyChunk(msg);
+}
+
+function _applyChunk(msg) {
+  const rec = _imgChunks[msg.msgId];
+  if (!rec) return;
+  rec.chunks[msg.index] = msg.chunk;
+  if (rec.total === null) rec.total = msg.total;
+  // Check if all chunks received
+  let allGot = rec.total !== null;
+  for (let i = 0; i < rec.total; i++) {
+    if (!rec.chunks[i]) { allGot = false; break; }
+  }
+  if (allGot) {
+    const fullImage = rec.chunks.join('');
+    // Inject image into the reserved bubble
+    if (rec.bubble) {
+      const img = document.createElement('img');
+      img.src = fullImage;
+      img.style.cssText = 'max-width:100%;border-radius:6px;margin-top:4px;display:block;cursor:pointer';
+      img.onclick = () => { const w = window.open(); w.document.write('<img src="'+fullImage+'">'); };
+      if (rec.text) rec.bubble.appendChild(document.createElement('br'));
+      rec.bubble.appendChild(img);
+      const container = document.getElementById('chatMessages');
+      container.scrollTop = container.scrollHeight;
+    }
+    delete _imgChunks[msg.msgId];
+  }
+}
+
+let _lastOppAvatar = null; // track opponent's latest avatar for chat bubbles
+
+function appendChatBubble({ text, image, name, avatar, isMe, reserveId }) {
+  const container = document.getElementById('chatMessages');
+  const wrap = document.createElement('div');
+  wrap.style.cssText = `display:flex;flex-direction:column;align-items:${isMe?'flex-end':'flex-start'};gap:3px`;
+
+  // Name + avatar row
+  const nameRow = document.createElement('div');
+  nameRow.style.cssText = `display:flex;align-items:center;gap:5px;font-size:0.65rem;color:var(--text-dim);${isMe?'flex-direction:row-reverse':''}`;
+  const avatarEl = document.createElement('div');
+  avatarEl.style.cssText = 'width:20px;height:20px;border-radius:50%;overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:0.7rem;background:var(--felt-dark);border:1px solid var(--panel-border)';
+  if (avatar) {
+    const ai = document.createElement('img');
+    ai.src = avatar; ai.style.cssText = 'width:100%;height:100%;object-fit:cover';
+    avatarEl.appendChild(ai);
+  } else { avatarEl.textContent = isMe ? '\u{1F3B4}' : '\u{1F464}'; }
+  nameRow.appendChild(avatarEl);
+  nameRow.appendChild(document.createTextNode(name));
+
+  // Bubble
+  const bubble = document.createElement('div');
+  bubble.style.cssText = `max-width:84%;padding:7px 10px;border-radius:${isMe?'12px 12px 3px 12px':'12px 12px 12px 3px'};background:${isMe?'rgba(201,168,76,0.15)':'rgba(255,255,255,0.06)'};border:1px solid ${isMe?'var(--gold-dim)':'var(--panel-border)'};font-size:0.82rem;color:var(--cream);word-break:break-word;line-height:1.5`;
+  if (text) {
+    const t = document.createElement('span'); t.textContent = text; bubble.appendChild(t);
+  }
+  if (image) {
+    const img = document.createElement('img');
+    img.src = image;
+    img.style.cssText = 'max-width:100%;border-radius:6px;margin-top:4px;display:block;cursor:pointer';
+    img.onclick = () => { const w = window.open(); w.document.write('<img src="'+image+'">'); };
+    if (text) bubble.appendChild(document.createElement('br'));
+    bubble.appendChild(img);
+  }
+
+  wrap.appendChild(nameRow);
+  wrap.appendChild(bubble);
+  container.appendChild(wrap);
+  container.scrollTop = container.scrollHeight;
+  return bubble; // return bubble element so chunks can append to it
+}
+
+// ===================================================
+// PROFILE — avatar + display name, synced everywhere
+// ===================================================
+
+function setMyAvatarEverywhere(dataUrl) {
+  myAvatar = dataUrl;
+  // Side panel large avatar
+  document.getElementById('myAvatarEmoji').style.display = 'none';
+  const panelImg = document.getElementById('myAvatarImg');
+  panelImg.src = dataUrl; panelImg.style.display = 'block';
+  // Table avatar
+  _setAvatarEl('tableMyAvatar', dataUrl);
+}
+
+function setOppAvatarEverywhere(dataUrl) {
+  _lastOppAvatar = dataUrl;
+  // Side panel opponent avatar
+  document.getElementById('oppAvatarEmoji').style.display = 'none';
+  const panelImg = document.getElementById('oppAvatarImg');
+  panelImg.src = dataUrl; panelImg.style.display = 'block';
+  // Table avatar
+  _setAvatarEl('tableOppAvatar', dataUrl);
+}
+
+function _setAvatarEl(id, dataUrl) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = '';
+  const img = document.createElement('img');
+  img.src = dataUrl;
+  img.style.cssText = 'width:100%;height:100%;object-fit:cover;border-radius:50%';
+  el.appendChild(img);
+}
+
+function handleAvatarUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  resizeImage(file, 200, 200, 0.8, dataUrl => {
+    setMyAvatarEverywhere(dataUrl);
+    broadcastProfile();
+  });
+}
+
+function handleChatImageUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  resizeImage(file, 800, 600, 0.75, dataUrl => {
+    pendingChatImage = dataUrl;
+    document.getElementById('chatImgThumb').src = dataUrl;
+    document.getElementById('chatImagePreview').style.display = 'block';
+  });
+}
+
+function resizeImage(file, maxW, maxH, quality, cb) {
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      let w = img.width, h = img.height;
+      if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+      if (h > maxH) { w = Math.round(w * maxH / h); h = maxH; }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      cb(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function clearChatImage() {
+  pendingChatImage = null;
+  document.getElementById('chatImagePreview').style.display = 'none';
+  document.getElementById('chatImgThumb').src = '';
+  document.getElementById('chatImageUpload').value = '';
+}
+
+function broadcastProfile() {
+  const name = (document.getElementById('myDisplayName').value || '').trim() || myName;
+  myName = name;
+  // Update all my name displays
+  document.getElementById('playerName').textContent = name;
+  document.getElementById('topbarPlayer').textContent = name;
+  // Send to peer — avatar sent separately as chunks to avoid size issues
+  send({ type: 'profile_update', name, pubkey: myECDHPublic });
+  // Send avatar in chunks if we have one
+  if (myAvatar) {
+    const totalChunks = Math.ceil(myAvatar.length / CHUNK_SIZE);
+    for (let i = 0; i < totalChunks; i++) {
+      send({ type: 'profile_avatar_chunk', chunk: myAvatar.slice(i*CHUNK_SIZE,(i+1)*CHUNK_SIZE),
+        index: i, total: totalChunks });
+    }
+  }
+}
+
+// Reassemble incoming avatar chunks
+const _avatarChunks = { chunks: [], total: null };
+
+function receiveAvatarChunk(msg) {
+  _avatarChunks.chunks[msg.index] = msg.chunk;
+  if (_avatarChunks.total === null) _avatarChunks.total = msg.total;
+  let allGot = _avatarChunks.total !== null;
+  for (let i = 0; i < _avatarChunks.total; i++) {
+    if (!_avatarChunks.chunks[i]) { allGot = false; break; }
+  }
+  if (allGot) {
+    const dataUrl = _avatarChunks.chunks.join('');
+    setOppAvatarEverywhere(dataUrl);
+    _avatarChunks.chunks = []; _avatarChunks.total = null;
+  }
+}
+
+function receiveProfile(msg) {
+  if (msg.name) {
+    opponentNameStr = msg.name;
+    document.getElementById('opponentName').textContent = msg.name;
+    document.getElementById('topbarOpponent').textContent = msg.name;
+    document.getElementById('opponentChatName').textContent = msg.name;
+  }
+  if (msg.pubkey && myECDHPrivate) {
+    deriveSharedKey(msg.pubkey).then(() => {
+      if (chatEncKey) addLog('&#128274; Chat encrypted', 'log-win');
+    });
+  }
+  // Always send our profile back so they get our name + pubkey + avatar
+  send({ type: 'profile_update', name: myName, pubkey: myECDHPublic });
+  if (myAvatar) {
+    const totalChunks = Math.ceil(myAvatar.length / CHUNK_SIZE);
+    for (let i = 0; i < totalChunks; i++) {
+      send({ type: 'profile_avatar_chunk', chunk: myAvatar.slice(i*CHUNK_SIZE,(i+1)*CHUNK_SIZE),
+        index: i, total: totalChunks });
+    }
+  }
+}
+
+
+
+// ===================================================
+// UI UTILITIES
+// ===================================================
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+    const tabs = ['stakes','log'];
+    btn.classList.toggle('active', tabs[i] === name);
+  });
+  document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+function addLog(msg, cls) {
+  const log = document.getElementById('gameLog');
+  const entry = document.createElement('div');
+  entry.className = 'log-entry ' + (cls||'');
+  const now = new Date();
+  const t = String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  entry.innerHTML = `<span class="log-time">${t}</span>${msg}`;
+  log.prepend(entry);
+}
+
+// ===================================================
+// SOLO / DEMO MODE — play vs AI opponent
+// ===================================================
+function startSoloMode() {
+  isHost = true;
+  myName = document.getElementById('playerNameInput').value.trim() || 'Player 1';
+  opponentNameStr = 'AI Opponent';
+  myPeerId = 'solo_player';
+  opponentPeerId = 'solo_ai';
+  onConnected();
+  document.getElementById('dealBtn').disabled = false;
+  activateSoloAI();
+  addLog('Solo mode — playing against AI', 'log-system');
+}
+
+function activateSoloAI() {
+  window._soloMode = true;
+  window._opponentTimer = null;
+  const _realSend = send;
+  window.send = function(msg) {
+    if (!window._soloMode) { _realSend(msg); return; }
+    if (msg.type === 'game_state') {
+      if (!msg.state.myTurn && msg.state.phase !== 'waiting' && msg.state.phase !== 'showdown') {
+        clearTimeout(window._opponentTimer);
+        window._opponentTimer = setTimeout(() => doAIAction(msg.state), 900 + Math.random() * 700);
+      }
+    }
+  };
+}
+
+function doAIAction(state) {
+  if (!state || state.phase === 'waiting' || state.phase === 'showdown') return;
+  const r = Math.random();
+  const callAmt = state.myBet - state.opponentBet;
+  let action, amount = 0;
+  if (callAmt > state.opponentChips * 0.3) {
+    action = r < 0.4 ? 'fold' : 'call';
+  } else if (callAmt > 0) {
+    action = r < 0.1 ? 'fold' : (r < 0.7 ? 'call' : 'raise');
+    if (action === 'raise') amount = state.myBet + state.bigBlind * 2;
+  } else {
+    action = r < 0.05 ? 'fold' : (r < 0.65 ? 'check' : 'raise');
+    if (action === 'raise') amount = state.bigBlind * 2;
+  }
+  // Mark opponent as acted before processing
+  gameState.oppActedThisRound = true;
+  handleOpponentAction(action, amount);
+}
+
+</script>
+</body>
+</html>
