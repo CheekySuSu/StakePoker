@@ -938,8 +938,17 @@ function connectToRoom() {
   }
 }
 
+// ── Reconnection state ──
+let _reconnectAttempts = 0;
+let _reconnectTimer    = null;
+const MAX_RECONNECT    = 5;
+
 function setupDataChannel(conn) {
   conn.on('open', () => {
+    _reconnectAttempts = 0;
+    clearTimeout(_reconnectTimer);
+    const toast = document.getElementById('disconnectToast');
+    toast.style.display = 'none'; toast.style.opacity = '';
     document.getElementById('connDot').className = 'status-dot dot-connected';
     document.getElementById('connStatus').textContent = 'Connected!';
     onConnected();
@@ -948,9 +957,52 @@ function setupDataChannel(conn) {
   conn.on('data', msg => handleMessage(msg));
   conn.on('close', () => {
     addLog('Opponent disconnected', 'log-system');
-    showDisconnectToast();
+    scheduleReconnect();
   });
-  conn.on('error', e => addLog('Connection error: ' + (e.message||e), 'log-system'));
+  conn.on('error', e => {
+    addLog('Connection error: ' + (e.message || e), 'log-system');
+    scheduleReconnect();
+  });
+}
+
+function scheduleReconnect() {
+  if (_reconnectAttempts >= MAX_RECONNECT) {
+    addLog('Could not reconnect — opponent may have left', 'log-system');
+    showDisconnectToast();
+    return;
+  }
+  _reconnectAttempts++;
+  const delay = Math.min(1500 * Math.pow(1.6, _reconnectAttempts - 1), 12000);
+  const toast  = document.getElementById('disconnectToast');
+  toast.textContent   = '\u27F3 Reconnecting\u2026 attempt ' + _reconnectAttempts + '/' + MAX_RECONNECT;
+  toast.style.display = 'block';
+  toast.style.opacity = '';
+  toast.style.transition = '';
+
+  _reconnectTimer = setTimeout(() => {
+    if (!peer || peer.destroyed) { showDisconnectToast(); return; }
+
+    if (!isHost && opponentPeerId) {
+      // Non-host knows the host peer ID — reconnect directly
+      try {
+        const conn = peer.connect(opponentPeerId, { reliable: true, serialization: 'json' });
+        dc = conn;
+        setupDataChannel(conn);
+        conn.on('error', () => scheduleReconnect());
+      } catch(e) { scheduleReconnect(); }
+    } else if (isHost) {
+      // Host re-arms the incoming connection listener so opponent can reconnect
+      peer.off('connection');
+      peer.on('connection', conn => { dc = conn; setupDataChannel(conn); });
+      toast.textContent = '\u27F3 Waiting for opponent to reconnect\u2026';
+      clearTimeout(_reconnectTimer);
+      _reconnectTimer = setTimeout(() => {
+        if (!dc || !dc.open) scheduleReconnect();
+      }, delay);
+    } else {
+      showDisconnectToast();
+    }
+  }, delay);
 }
 
 function showDisconnectToast() {
@@ -1789,13 +1841,17 @@ function negDecline() {
 }
 
 function finaliseNegotiatedStake(desc, coins, proposerPeerId) {
-  // The stake always belongs to whoever proposed it — so both players store it under the proposer's peerId.
-  // This means: proposer sees it in "Your Stakes", receiver sees it in "Opponent's Stakes".
-  const createdBy = proposerPeerId || myPeerId || 'me';
+  // Use the iAmProposer flag directly — peer ID comparison is unreliable if myPeerId was null at proposal time.
+  // Proposer sees it in "Your Stakes"; receiver sees it in "Opponent's Stakes".
+  const iAmProposer = negotiation.iAmProposer;
+  const createdBy = iAmProposer
+    ? (myPeerId || 'me')
+    : (proposerPeerId || opponentPeerId || 'opponent');
+
   const stake = { id: ++stakeIdCounter, description: desc, coins, createdBy };
   allStakes.push(stake);
-  // Chips are added to the proposer's stack — if I am the proposer, add to my chips; otherwise the host's chips update is reflected when they finalise
-  if (createdBy === (myPeerId || 'me')) {
+  // Only add chips to MY stack if I was the one who proposed the stake
+  if (iAmProposer) {
     gameState.myChips += coins;
   }
   renderTable();
@@ -2180,12 +2236,13 @@ async function sendChatMessage() {
   send({ type: 'chat_msg', msgId, encText, hasImage: hasMedia, mediaType, senderName });
 
   if (mediaToSend) {
-    const data = mediaToSend.dataUrl;
-    const totalChunks = Math.ceil(data.length / CHUNK_SIZE);
+    // Compress the data before chunking — helps for non-video assets; for video WebM already compressed
+    const { data: sendData, compressed: isCompressed } = await deflateData(mediaToSend.dataUrl);
+    const totalChunks = Math.ceil(sendData.length / CHUNK_SIZE);
     await new Promise(r => setTimeout(r, 60));
     for (let i = 0; i < totalChunks; i++) {
-      const chunk = data.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
-      send({ type: 'chat_img_chunk', msgId, chunk, index: i, total: totalChunks, mediaType });
+      const chunk = sendData.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+      send({ type: 'chat_img_chunk', msgId, chunk, index: i, total: totalChunks, mediaType, compressed: isCompressed });
       if (i % 5 === 4) await new Promise(r => setTimeout(r, 20));
     }
   }
@@ -2248,6 +2305,7 @@ function _applyChunk(msg) {
   const rec = _imgChunks[msg.msgId];
   if (!rec) return;
   if (!rec.mediaType && msg.mediaType) rec.mediaType = msg.mediaType;
+  if (msg.compressed !== undefined && rec.compressed === undefined) rec.compressed = msg.compressed;
   rec.chunks[msg.index] = msg.chunk;
   if (rec.total === null) rec.total = msg.total;
   // Update progress indicator
@@ -2263,33 +2321,42 @@ function _applyChunk(msg) {
   for (let i = 0; i < rec.total; i++) {
     if (!rec.chunks[i]) { allGot = false; break; }
   }
-  if (allGot) {
-    const fullData = rec.chunks.join('');
-    if (rec.bubble) {
-      // Remove loading spinner if present
-      const spinner = rec.bubble.querySelector('.media-loading');
-      if (spinner) spinner.remove();
+  if (allGot) _finaliseMedia(msg.msgId);
+}
 
-      if (rec.mediaType === 'video') {
-        const vid = document.createElement('video');
-        vid.src = fullData;
-        vid.controls = true;
-        vid.style.cssText = 'max-width:100%;max-height:240px;border-radius:6px;margin-top:4px;display:block;background:#000';
-        vid.preload = 'metadata';
-        if (rec.text) rec.bubble.appendChild(document.createElement('br'));
-        rec.bubble.appendChild(vid);
-      } else {
-        const img = document.createElement('img');
-        img.src = fullData;
-        img.style.cssText = 'max-width:100%;border-radius:6px;margin-top:4px;display:block;cursor:pointer';
-        img.onclick = () => { const w = window.open(); w.document.write('<img src="'+fullData+'">'); };
-        if (rec.text) rec.bubble.appendChild(document.createElement('br'));
-        rec.bubble.appendChild(img);
-      }
-      const container = document.getElementById('chatMessages');
-      container.scrollTop = container.scrollHeight;
+async function _finaliseMedia(msgId) {
+  const rec = _imgChunks[msgId];
+  if (!rec) return;
+  delete _imgChunks[msgId]; // claim it immediately to prevent double-finalise
+
+  let fullData = rec.chunks.join('');
+  if (rec.compressed) {
+    fullData = await inflateData(fullData);
+  }
+
+  if (rec.bubble) {
+    // Remove loading spinner if present
+    const spinner = rec.bubble.querySelector('.media-loading');
+    if (spinner) spinner.remove();
+
+    if (rec.mediaType === 'video') {
+      const vid = document.createElement('video');
+      vid.src = fullData;
+      vid.controls = true;
+      vid.style.cssText = 'max-width:100%;max-height:240px;border-radius:6px;margin-top:4px;display:block;background:#000';
+      vid.preload = 'metadata';
+      if (rec.text) rec.bubble.appendChild(document.createElement('br'));
+      rec.bubble.appendChild(vid);
+    } else {
+      const img = document.createElement('img');
+      img.src = fullData;
+      img.style.cssText = 'max-width:100%;border-radius:6px;margin-top:4px;display:block;cursor:pointer';
+      img.onclick = () => { const w = window.open(); w.document.write('<img src="'+fullData+'">'); };
+      if (rec.text) rec.bubble.appendChild(document.createElement('br'));
+      rec.bubble.appendChild(img);
     }
-    delete _imgChunks[msg.msgId];
+    const container = document.getElementById('chatMessages');
+    container.scrollTop = container.scrollHeight;
   }
 }
 
@@ -2502,7 +2569,114 @@ function handleAvatarUpload(e) {
 
 const MAX_VIDEO_BYTES = 80 * 1024 * 1024; // 80 MB hard limit
 
-function handleChatMediaUpload(e) {
+// ─── Deflate / inflate for transfer compression ───────────────────────────
+async function deflateData(str) {
+  if (typeof CompressionStream === 'undefined') return { data: str, compressed: false };
+  try {
+    const bytes = new TextEncoder().encode(str);
+    const cs = new CompressionStream('deflate-raw');
+    const writer = cs.writable.getWriter();
+    writer.write(bytes); writer.close();
+    const reader = cs.readable.getReader();
+    const parts = [];
+    for (;;) { const { done, value } = await reader.read(); if (done) break; parts.push(value); }
+    const out = new Uint8Array(parts.reduce((a, v) => a + v.length, 0));
+    let off = 0; parts.forEach(v => { out.set(v, off); off += v.length; });
+    const b64 = btoa(String.fromCharCode(...out));
+    return b64.length < str.length ? { data: b64, compressed: true } : { data: str, compressed: false };
+  } catch(e) { return { data: str, compressed: false }; }
+}
+
+async function inflateData(str) {
+  if (typeof DecompressionStream === 'undefined') return str;
+  try {
+    const bytes = Uint8Array.from(atob(str), c => c.charCodeAt(0));
+    const ds = new DecompressionStream('deflate-raw');
+    const writer = ds.writable.getWriter();
+    writer.write(bytes); writer.close();
+    const reader = ds.readable.getReader();
+    const parts = [];
+    for (;;) { const { done, value } = await reader.read(); if (done) break; parts.push(value); }
+    const out = new Uint8Array(parts.reduce((a, v) => a + v.length, 0));
+    let off = 0; parts.forEach(v => { out.set(v, off); off += v.length; });
+    return new TextDecoder().decode(out);
+  } catch(e) { return str; }
+}
+
+// ─── Re-encode video to WebM via MediaRecorder (drops audio, reduces size) ───
+async function compressVideoForTransfer(file, onProgress) {
+  const supportsWebM = window.MediaRecorder &&
+    (MediaRecorder.isTypeSupported('video/webm;codecs=vp8') ||
+     MediaRecorder.isTypeSupported('video/webm'));
+
+  const rawRead = () => new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = ev => res(ev.target.result);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+
+  if (!supportsWebM) return rawRead();
+
+  return new Promise((resolve) => {
+    const video = document.createElement('video');
+    const objUrl = URL.createObjectURL(file);
+    video.src = objUrl; video.muted = true; video.playsInline = true;
+
+    const cleanup = () => URL.revokeObjectURL(objUrl);
+    const fallback = () => { cleanup(); rawRead().then(resolve); };
+
+    const timeout = setTimeout(fallback, 45000);
+
+    video.onloadedmetadata = () => {
+      const maxW = 640;
+      let w = video.videoWidth || 640, h = video.videoHeight || 360;
+      if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      const stream = canvas.captureStream(24);
+
+      const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
+        ? 'video/webm;codecs=vp8' : 'video/webm';
+      let recorder;
+      try { recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 900_000 }); }
+      catch(e) { try { recorder = new MediaRecorder(stream); } catch(e2) { clearTimeout(timeout); fallback(); return; } }
+
+      const chunks = [];
+      recorder.ondataavailable = ev => { if (ev.data.size > 0) chunks.push(ev.data); };
+      recorder.onstop = () => {
+        clearTimeout(timeout); cleanup();
+        const blob = new Blob(chunks, { type: 'video/webm' });
+        if (blob.size > 0 && blob.size < file.size * 0.98) {
+          if (onProgress) onProgress('done', blob.size, file.size);
+          const r = new FileReader();
+          r.onload = ev => resolve(ev.target.result);
+          r.readAsDataURL(blob);
+        } else {
+          rawRead().then(resolve);
+        }
+      };
+      recorder.onerror = () => { clearTimeout(timeout); fallback(); };
+
+      let rafId, duration = video.duration || 0;
+      const drawFrame = () => {
+        if (video.ended || video.paused) { if (recorder.state === 'recording') recorder.stop(); return; }
+        ctx.drawImage(video, 0, 0, w, h);
+        if (onProgress && duration > 0) onProgress('progress', video.currentTime / duration);
+        rafId = requestAnimationFrame(drawFrame);
+      };
+      video.onended = () => { cancelAnimationFrame(rafId); if (recorder.state === 'recording') recorder.stop(); };
+
+      recorder.start(200);
+      video.play().then(drawFrame).catch(() => { clearTimeout(timeout); fallback(); });
+    };
+    video.onerror = () => { clearTimeout(timeout); fallback(); };
+  });
+}
+
+async function handleChatMediaUpload(e) {
   const file = e.target.files[0];
   if (!file) return;
 
@@ -2515,13 +2689,22 @@ function handleChatMediaUpload(e) {
       e.target.value = '';
       return;
     }
-    // Read video as-is — no canvas re-encode for video
-    const reader = new FileReader();
-    reader.onload = ev => {
-      pendingChatMedia = { dataUrl: ev.target.result, type: 'video', name: file.name };
-      showMediaPreview(pendingChatMedia);
+    // Show compression progress in the attach label
+    const attachLabel = document.querySelector('label[title*="Attach"]');
+    const origHTML = attachLabel ? attachLabel.innerHTML : '';
+    if (attachLabel) attachLabel.innerHTML = '&#9203; Compressing&hellip; 0%';
+
+    const onProg = (stage, a, b) => {
+      if (!attachLabel) return;
+      if (stage === 'progress') attachLabel.innerHTML = '&#9203; Compressing&hellip; ' + Math.round(a * 100) + '%';
+      if (stage === 'done') attachLabel.innerHTML = '&#10003; Compressed ' + Math.round(b/1024) + 'KB&rarr;' + Math.round(a/1024) + 'KB';
     };
-    reader.readAsDataURL(file);
+
+    compressVideoForTransfer(file, onProg).then(dataUrl => {
+      if (attachLabel) setTimeout(() => { attachLabel.innerHTML = origHTML; }, 2000);
+      pendingChatMedia = { dataUrl, type: 'video', name: file.name.replace(/\.[^.]+$/, '') + '.webm' };
+      showMediaPreview(pendingChatMedia);
+    });
   } else if (isGif) {
     // GIFs must not go through canvas (kills animation) — read raw
     const reader = new FileReader();
