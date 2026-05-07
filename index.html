@@ -850,6 +850,44 @@ function onProviderChange() {
   if (labels[p]) document.getElementById('apiKeyLabel').textContent = labels[p];
 }
 
+
+// Shared PeerJS config for internet connectivity
+const PEER_CONFIG = {
+  debug: 2,
+  secure: true,
+  config: {
+    iceTransportPolicy: 'all',
+    sdpSemantics: 'unified-plan',
+    iceServers: [
+      { urls: 'stun:stun.l.google.com:19302' },
+      { urls: 'stun:stun1.l.google.com:19302' },
+      { urls: 'stun:stun2.l.google.com:19302' },
+      { urls: 'stun:global.stun.twilio.com:3478' },
+
+      {
+        urls: 'turn:openrelay.metered.ca:80',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      },
+      {
+        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+        username: 'openrelayproject',
+        credential: 'openrelayproject'
+      },
+      {
+        urls: 'turn:global.turn.twilio.com:3478?transport=udp',
+        username: 'guest',
+        credential: 'guest'
+      }
+    ]
+  }
+};
+
 // ===================================================
 // PeerJS P2P CONNECTION
 // ===================================================
@@ -865,30 +903,7 @@ function generateRoomCode() {
 
   if (peer) { peer.destroy(); peer = null; }
 
-  peer = new Peer({
-    config: {
-      iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-
-        {
-          urls: 'turn:openrelay.metered.ca:80',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        },
-        {
-          urls: 'turn:openrelay.metered.ca:443',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        },
-        {
-          urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        }
-      ]
-    }
-  });
+  peer = new Peer(PEER_CONFIG);
 
   peer.on('open', id => {
     isHost = true;
@@ -922,7 +937,12 @@ function connectToRoom() {
   document.getElementById('connStatus').textContent = 'Connecting...';
 
   const doConnect = () => {
-    const conn = peer.connect(code, { reliable: true, serialization: 'json', metadata: { initiator: true } });
+    const conn = peer.connect(code, {
+      reliable: true,
+      serialization: 'json',
+      metadata: { initiator: true },
+      ordered: true
+    });
     dc = conn;
     setupDataChannel(conn);
     conn.on('error', err => {
@@ -933,30 +953,7 @@ function connectToRoom() {
   };
 
   if (!peer) {
-    peer = new Peer({
-      config: {
-        iceServers: [
-        { urls: 'stun:stun.l.google.com:19302' },
-        { urls: 'stun:stun1.l.google.com:19302' },
-
-        {
-          urls: 'turn:openrelay.metered.ca:80',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        },
-        {
-          urls: 'turn:openrelay.metered.ca:443',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        },
-        {
-          urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-          username: 'openrelayproject',
-          credential: 'openrelayproject'
-        }
-      ]
-      }
-    });
+    peer = new Peer(PEER_CONFIG);
     peer.on('open', id => { myPeerId = id; doConnect(); });
     peer.on('error', err => {
       console.error('Peer error:', err);
@@ -984,6 +981,15 @@ let _reconnectTimer    = null;
 const MAX_RECONNECT    = 5;
 
 function setupDataChannel(conn) {
+  if (conn.peerConnection) {
+    conn.peerConnection.oniceconnectionstatechange = () => {
+      console.log('ICE state:', conn.peerConnection.iceConnectionState);
+    };
+    conn.peerConnection.onconnectionstatechange = () => {
+      console.log('Connection state:', conn.peerConnection.connectionState);
+    };
+  }
+
   conn.on('open', () => {
     _reconnectAttempts = 0;
     clearTimeout(_reconnectTimer);
