@@ -867,7 +867,8 @@ function saveState() {
       myPeerId,
       opponentPeerId,
       isHost,
-      // Chips & stakes
+      // Chips & stakes — only valid when a session is/was active
+      sessionActive: !!opponentPeerId,
       myChips: gameState.myChips,
       allStakes,
       stakeIdCounter,
@@ -958,16 +959,18 @@ function restoreFromSave(data) {
     if (inp) inp.value = data.customModel;
   }
 
-  // Restore chips
-  if (typeof data.myChips === 'number') {
+  // Restore chips — only if we are restoring an active in-session state
+  // (onConnected() resets these for new sessions; only apply here if returning to existing session)
+  // We tag the save with a flag when a real session was active.
+  if (typeof data.myChips === 'number' && data.sessionActive) {
     gameState.myChips = data.myChips;
   }
 
-  // Restore stakes
-  if (Array.isArray(data.allStakes)) {
+  // Restore stakes — same guard: only if flagged as an active session save
+  if (Array.isArray(data.allStakes) && data.sessionActive) {
     allStakes = data.allStakes;
   }
-  if (typeof data.stakeIdCounter === 'number') {
+  if (typeof data.stakeIdCounter === 'number' && data.sessionActive) {
     stakeIdCounter = data.stakeIdCounter;
   }
 
@@ -1460,6 +1463,14 @@ function onConnected() {
 
   document.getElementById('dealBtn').disabled = !isHost;
   addLog('Connected to ' + opponentNameStr, 'log-system');
+
+  // Clear stale session data (chips, stakes, game state) so each new connection starts fresh.
+  // Identity & settings are preserved. Chat/log history is kept for context.
+  gameState.myChips = 50;
+  gameState.opponentChips = 50;
+  allStakes = [];
+  stakeIdCounter = 0;
+  resetGame();
 
   // Restore stakes display now that myPeerId is set
   if (allStakes.length) renderStakes();
@@ -2292,9 +2303,12 @@ function finaliseNegotiatedStake(desc, coins, proposerPeerId) {
 
   const stake = { id: ++stakeIdCounter, description: desc, coins, createdBy };
   allStakes.push(stake);
-  // Only add chips to MY stack if I was the one who proposed the stake
+  // Add chips to the proposer's stack
   if (iAmProposer) {
     gameState.myChips += coins;
+  } else {
+    // Opponent proposed — credit their chip stack on our side
+    gameState.opponentChips += coins;
   }
   renderTable();
   renderStakes();
@@ -2488,8 +2502,12 @@ function receiveOpponentStake(stake) {
   // Only add if we don't already have it (avoid duplicates)
   if (!allStakes.find(s => s.id === stake.id && s.createdBy === stake.createdBy)) {
     allStakes.push(stake);
+    // Credit opponent's chip stack — they earned these coins by submitting a stake
+    gameState.opponentChips += stake.coins;
+    renderTable();
     renderStakes();
-    addLog('Opponent added stake: "' + stake.description + '" (' + stake.coins + ' coins)', 'log-system');
+    addLog('Opponent added stake: "' + stake.description + '" (+' + stake.coins + ' coins to their stack)', 'log-system');
+    saveDebounced();
   }
 }
 
