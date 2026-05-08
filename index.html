@@ -586,6 +586,7 @@ html,body { height:100%; overflow:hidden; background:#060f0a; font-family:'Spect
     <div class="topbar-conn">
       <span class="status-dot dot-connected"></span>
       <span>P2P Connected</span>
+      <span id="saveIndicator" style="font-size:0.68rem;color:var(--gold-dim);opacity:0;transition:opacity 0.5s" title="Progress saved">💾 saved</span>
       <button class="topbar-btn" onclick="showOverlay()">Disconnect</button>
     </div>
   </div>
@@ -851,39 +852,191 @@ function onProviderChange() {
 }
 
 
+// ===================================================
+// PERSISTENCE — localStorage save/restore
+// ===================================================
+const SAVE_KEY = 'stakepoker_v1';
+
+function saveState() {
+  try {
+    const data = {
+      // Identity
+      myName,
+      myAvatar,
+      // Session
+      myPeerId,
+      opponentPeerId,
+      isHost,
+      // Chips & stakes
+      myChips: gameState.myChips,
+      allStakes,
+      stakeIdCounter,
+      // Settings
+      provider: document.getElementById('providerSelect')?.value,
+      apiKey: document.getElementById('apiKeyInput')?.value,
+      customEndpoint: document.getElementById('customEndpointInput')?.value,
+      customModel: document.getElementById('customModelInput')?.value,
+      // Game log (last 60 entries)
+      gameLog: Array.from(document.getElementById('gameLog')?.children || [])
+        .slice(0, 60)
+        .map(el => ({ html: el.innerHTML, cls: el.className.replace('log-entry','').trim() })),
+      // Chat messages (last 40, excluding media blobs to save space)
+      chatMessages: Array.from(document.getElementById('chatMessages')?.children || [])
+        .slice(-40)
+        .map(el => {
+          // Only persist text bubbles, not image/video blobs
+          const isBlob = el.querySelector('img[src^="data:"]') || el.querySelector('video');
+          if (isBlob) return null;
+          return { html: el.outerHTML };
+        })
+        .filter(Boolean),
+      savedAt: Date.now()
+    };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    // Flash save indicator
+    const ind = document.getElementById('saveIndicator');
+    if (ind) {
+      ind.style.opacity = '1';
+      clearTimeout(saveState._fadeT);
+      saveState._fadeT = setTimeout(() => { ind.style.opacity = '0'; }, 1800);
+    }
+  } catch(e) {
+    // QuotaExceededError — trim avatar and retry
+    try {
+      const data = JSON.parse(localStorage.getItem(SAVE_KEY) || '{}');
+      data.myAvatar = null; // drop the large blob
+      data.savedAt = Date.now();
+      localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+    } catch(e2) { /* give up silently */ }
+  }
+}
+
+function loadSavedState() {
+  try {
+    const raw = localStorage.getItem(SAVE_KEY);
+    if (!raw) return null;
+    const data = JSON.parse(raw);
+    // Expire saves older than 7 days
+    if (!data.savedAt || Date.now() - data.savedAt > 7 * 24 * 3600 * 1000) {
+      localStorage.removeItem(SAVE_KEY);
+      return null;
+    }
+    return data;
+  } catch(e) { return null; }
+}
+
+function restoreFromSave(data) {
+  if (!data) return;
+
+  // Restore identity
+  if (data.myName) {
+    myName = data.myName;
+    document.getElementById('playerNameInput').value = myName;
+    const dispName = document.getElementById('myDisplayName');
+    if (dispName) dispName.value = myName;
+  }
+  if (data.myAvatar) {
+    myAvatar = data.myAvatar;
+    setMyAvatarEverywhere(data.myAvatar);
+  }
+
+  // Restore settings
+  if (data.provider) {
+    const sel = document.getElementById('providerSelect');
+    if (sel) { sel.value = data.provider; onProviderChange(); }
+  }
+  if (data.apiKey) {
+    const inp = document.getElementById('apiKeyInput');
+    if (inp) inp.value = data.apiKey;
+  }
+  if (data.customEndpoint) {
+    const inp = document.getElementById('customEndpointInput');
+    if (inp) inp.value = data.customEndpoint;
+  }
+  if (data.customModel) {
+    const inp = document.getElementById('customModelInput');
+    if (inp) inp.value = data.customModel;
+  }
+
+  // Restore chips
+  if (typeof data.myChips === 'number') {
+    gameState.myChips = data.myChips;
+  }
+
+  // Restore stakes
+  if (Array.isArray(data.allStakes)) {
+    allStakes = data.allStakes;
+  }
+  if (typeof data.stakeIdCounter === 'number') {
+    stakeIdCounter = data.stakeIdCounter;
+  }
+
+  // Restore session identifiers for reconnect
+  if (data.opponentPeerId) opponentPeerId = data.opponentPeerId;
+  if (data.isHost !== undefined) isHost = data.isHost;
+
+  // Restore game log
+  if (Array.isArray(data.gameLog) && data.gameLog.length) {
+    const log = document.getElementById('gameLog');
+    if (log) {
+      log.innerHTML = '';
+      data.gameLog.forEach(entry => {
+        const el = document.createElement('div');
+        el.className = 'log-entry ' + (entry.cls || '');
+        el.innerHTML = entry.html;
+        log.appendChild(el);
+      });
+    }
+  }
+
+  // Restore chat messages (text only)
+  if (Array.isArray(data.chatMessages) && data.chatMessages.length) {
+    const chat = document.getElementById('chatMessages');
+    if (chat) {
+      chat.innerHTML = '';
+      data.chatMessages.forEach(msg => {
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = msg.html;
+        const el = wrapper.firstElementChild;
+        if (el) chat.appendChild(el);
+      });
+      chat.scrollTop = chat.scrollHeight;
+    }
+  }
+}
+
+function clearSavedState() {
+  try { localStorage.removeItem(SAVE_KEY); } catch(e) {}
+}
+
+// Auto-save on key state changes
+function saveDebounced() {
+  clearTimeout(saveDebounced._t);
+  saveDebounced._t = setTimeout(saveState, 800);
+}
+
 // Shared PeerJS config for internet connectivity
+// Uses multiple reliable public STUN servers + Metered TURN for NAT traversal
 const PEER_CONFIG = {
-  debug: 2,
-  secure: true,
+  debug: 1,
   config: {
     iceTransportPolicy: 'all',
     sdpSemantics: 'unified-plan',
+    iceCandidatePoolSize: 4,
     iceServers: [
+      // Google public STUN (highly reliable)
       { urls: 'stun:stun.l.google.com:19302' },
       { urls: 'stun:stun1.l.google.com:19302' },
       { urls: 'stun:stun2.l.google.com:19302' },
-      { urls: 'stun:global.stun.twilio.com:3478' },
-
-      {
-        urls: 'turn:openrelay.metered.ca:80',
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
-      },
-      {
-        urls: 'turn:openrelay.metered.ca:443',
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
-      },
-      {
-        urls: 'turn:openrelay.metered.ca:443?transport=tcp',
-        username: 'openrelayproject',
-        credential: 'openrelayproject'
-      },
-      {
-        urls: 'turn:global.turn.twilio.com:3478?transport=udp',
-        username: 'guest',
-        credential: 'guest'
-      }
+      { urls: 'stun:stun3.l.google.com:19302' },
+      // Cloudflare STUN
+      { urls: 'stun:stun.cloudflare.com:3478' },
+      // Open Relay TURN — free, no auth needed
+      { urls: 'turn:openrelay.metered.ca:80',   username: 'openrelayproject', credential: 'openrelayproject' },
+      { urls: 'turn:openrelay.metered.ca:443',  username: 'openrelayproject', credential: 'openrelayproject' },
+      { urls: 'turns:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+      // Xirsys free TURN (fallback)
+      { urls: 'stun:fr-turn1.xirsys.com' },
     ]
   }
 };
@@ -901,9 +1054,13 @@ function generateRoomCode() {
   document.getElementById('genStatus').textContent = 'Connecting to relay...';
   document.getElementById('genDot').className = 'status-dot dot-waiting';
 
-  if (peer) { peer.destroy(); peer = null; }
+  if (peer) { try { peer.destroy(); } catch(e){} peer = null; }
 
-  peer = new Peer(PEER_CONFIG);
+  // Reclaim the saved peer ID so guests can still reach us after a host reload.
+  // If the ID is already taken on the relay (rare), PeerJS will error with 'unavailable-id'
+  // and we fall back to a fresh random ID.
+  const _savedId = loadSavedState()?.myPeerId;
+  peer = _savedId ? new Peer(_savedId, PEER_CONFIG) : new Peer(PEER_CONFIG);
 
   peer.on('open', id => {
     isHost = true;
@@ -920,8 +1077,50 @@ function generateRoomCode() {
     setupDataChannel(conn);
   });
 
+  peer.on('disconnected', () => {
+    // Signaling server dropped — try to reconnect to it (keeps same peer ID)
+    if (peer && !peer.destroyed) {
+      document.getElementById('genStatus').textContent = '⟳ Relay disconnected — reconnecting…';
+      setTimeout(() => {
+        if (peer && !peer.destroyed) {
+          peer.reconnect();
+          // Re-arm incoming connection listener once signaling is back
+          peer.once('open', () => armHostConnectionListener());
+        }
+      }, 1500);
+    }
+  });
+
   peer.on('error', err => {
-    document.getElementById('genStatus').textContent = 'Error: ' + err.message;
+    // Saved ID may still be "live" on the relay — get a fresh random one instead
+    if (err.type === 'unavailable-id') {
+      try { peer.destroy(); } catch(e) {}
+      peer = new Peer(PEER_CONFIG);
+      peer.on('open', id => {
+        isHost = true; myPeerId = id;
+        document.getElementById('myTokenDisplay').textContent = id;
+        document.getElementById('genStatus').textContent = 'Share this code — click to copy';
+        document.getElementById('genDot').className = 'status-dot dot-connected';
+        document.getElementById('connectBtn').disabled = false;
+      });
+      peer.on('connection', conn => { dc = conn; setupDataChannel(conn); });
+      peer.on('disconnected', () => {
+        if (peer && !peer.destroyed) {
+          peer.reconnect();
+          peer.once('open', () => armHostConnectionListener());
+        }
+      });
+      peer.on('error', err2 => {
+        document.getElementById('genStatus').textContent = 'Error: ' + (err2.message || err2.type || err2);
+        document.getElementById('genDot').className = 'status-dot dot-waiting';
+        document.getElementById('generateBtn').disabled = false;
+      });
+      return;
+    }
+    const msg = err.type === 'network' ? 'Network error — check your connection'
+              : err.type === 'server-error' ? 'Relay server error — try again'
+              : 'Error: ' + (err.message || err.type || err);
+    document.getElementById('genStatus').textContent = msg;
     document.getElementById('genDot').className = 'status-dot dot-waiting';
     document.getElementById('generateBtn').disabled = false;
   });
@@ -941,126 +1140,308 @@ function connectToRoom() {
       reliable: true,
       serialization: 'json',
       metadata: { initiator: true },
-      ordered: true
+      ordered: true,
+      config: PEER_CONFIG.config
     });
     dc = conn;
+    opponentPeerId = code; // remember for reconnect
     setupDataChannel(conn);
     conn.on('error', err => {
-      document.getElementById('connStatus').textContent = 'Failed: ' + err.message;
+      document.getElementById('connStatus').textContent = 'Failed: ' + (err.message || err.type || err);
       document.getElementById('connDot').className = 'status-dot dot-waiting';
       document.getElementById('connectBtn').disabled = false;
     });
   };
 
-  if (!peer) {
-    peer = new Peer(PEER_CONFIG);
-    peer.on('open', id => { myPeerId = id; doConnect(); });
-    peer.on('error', err => {
-      console.error('Peer error:', err);
-      document.getElementById('connStatus').textContent = 'Error: ' + err.message;
-      document.getElementById('connectBtn').disabled = false;
-    });
+  const initPeer = () => {
+    // Reclaim our saved peer ID so the host's reconnect logic can find us again after reload.
+    const _savedGuestId = loadSavedState()?.myPeerId;
+    const _makeConn = (p) => {
+      p.on('open', id => { myPeerId = id; doConnect(); });
+      p.on('error', err => {
+        // Saved ID may already be claimed — retry with a fresh random one
+        if (err.type === 'unavailable-id') {
+          try { p.destroy(); } catch(e) {}
+          const fresh = new Peer(PEER_CONFIG);
+          peer = fresh;
+          _makeConn(fresh);
+          return;
+        }
+        const msg = err.type === 'peer-unavailable' ? 'Room not found — check the code'
+                  : err.type === 'network' ? 'Network error — check your connection'
+                  : 'Error: ' + (err.message || err.type || err);
+        document.getElementById('connStatus').textContent = msg;
+        document.getElementById('connDot').className = 'status-dot dot-waiting';
+        document.getElementById('connectBtn').disabled = false;
+      });
+      p.on('disconnected', () => {
+        if (p && !p.destroyed) setTimeout(() => { if (p && !p.destroyed) p.reconnect(); }, 1500);
+      });
+    };
+    peer = _savedGuestId ? new Peer(_savedGuestId, PEER_CONFIG) : new Peer(PEER_CONFIG);
+    _makeConn(peer);
+  };
 
-    peer.on('disconnected', () => {
-      console.log('Peer disconnected');
-    });
-
-    peer.on('close', () => {
-      console.log('Peer closed');
-    });
+  if (!peer || peer.destroyed) {
+    initPeer();
   } else if (peer.open) {
     doConnect();
   } else {
-    peer.on('open', doConnect);
+    peer.once('open', doConnect);
   }
 }
 
 // ── Reconnection state ──
 let _reconnectAttempts = 0;
 let _reconnectTimer    = null;
-const MAX_RECONNECT    = 5;
+let _iceDisconnectTimer = null;
+let _isConnected = false;        // true once first successful connection established
+const MAX_RECONNECT = 8;
+const RECONNECT_BASE_MS = 2000;
 
+// Attach all listeners to a data connection.
+// firstConnect=true only on the very first successful open (not on reconnects).
 function setupDataChannel(conn) {
-  if (conn.peerConnection) {
+  // Track ICE state for early failure detection
+  const watchIce = () => {
+    if (!conn.peerConnection) return;
     conn.peerConnection.oniceconnectionstatechange = () => {
-      console.log('ICE state:', conn.peerConnection.iceConnectionState);
+      const s = conn.peerConnection.iceConnectionState;
+      if (s === 'failed') {
+        triggerReconnect('ICE failed');
+      } else if (s === 'disconnected') {
+        // Give WebRTC 5s to self-heal (it often does on mobile)
+        clearTimeout(_iceDisconnectTimer);
+        _iceDisconnectTimer = setTimeout(() => {
+          if (conn.peerConnection && conn.peerConnection.iceConnectionState === 'disconnected') {
+            triggerReconnect('ICE disconnected');
+          }
+        }, 5000);
+      } else if (s === 'connected' || s === 'completed') {
+        clearTimeout(_iceDisconnectTimer);
+      }
     };
-    conn.peerConnection.onconnectionstatechange = () => {
-      console.log('Connection state:', conn.peerConnection.connectionState);
-    };
-  }
+  };
 
+  // peerConnection may not exist yet when conn is first created — wait for open
   conn.on('open', () => {
-    _reconnectAttempts = 0;
+    watchIce();
     clearTimeout(_reconnectTimer);
+    clearTimeout(_iceDisconnectTimer);
+    _reconnectAttempts = 0;
+
+    // Hide disconnect toast
     const toast = document.getElementById('disconnectToast');
-    toast.style.display = 'none'; toast.style.opacity = '';
+    toast.style.display = 'none';
+    toast.style.opacity = '';
+
     document.getElementById('connDot').className = 'status-dot dot-connected';
     document.getElementById('connStatus').textContent = 'Connected!';
-    onConnected();
+
+    if (!_isConnected) {
+      // First-ever connection — run full init
+      _isConnected = true;
+      onConnected();
+    } else {
+      // Reconnection — just re-sync profile and game state without re-running full init
+      addLog('Reconnected ✓', 'log-system');
+      send({ type: 'profile_update', name: myName, pubkey: myECDHPublic });
+      if (myAvatar) {
+        const totalChunks = Math.ceil(myAvatar.length / CHUNK_SIZE);
+        for (let i = 0; i < totalChunks; i++) {
+          send({ type: 'profile_avatar_chunk',
+            chunk: myAvatar.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE),
+            index: i, total: totalChunks });
+        }
+      }
+      // Re-send current game state so both sides re-sync
+      if (isHost && gameState.phase !== 'waiting') {
+        send({ type: 'game_state', state: gameState });
+      }
+    }
+
+    // Always send hello so the other side gets our peerId
     send({ type: 'hello', name: myName, peerId: myPeerId });
   });
+
   conn.on('data', msg => handleMessage(msg));
+
   conn.on('close', () => {
-    addLog('Opponent disconnected', 'log-system');
-    scheduleReconnect();
+    if (dc === conn) triggerReconnect('connection closed');
   });
+
   conn.on('error', e => {
-    addLog('Connection error: ' + (e.message || e), 'log-system');
-    scheduleReconnect();
+    if (dc === conn) triggerReconnect('error: ' + (e.message || e.type || e));
   });
+}
+
+// Single entry point for any disconnect event — debounced so multiple
+// simultaneous events (close + ICE fail) don't stack up attempts.
+let _triggerTimer = null;
+function triggerReconnect(reason) {
+  clearTimeout(_triggerTimer);
+  _triggerTimer = setTimeout(() => {
+    addLog('Connection lost (' + reason + ') — reconnecting…', 'log-system');
+    scheduleReconnect();
+  }, 200);
 }
 
 function scheduleReconnect() {
+  clearTimeout(_reconnectTimer);
+  clearTimeout(_iceDisconnectTimer);
+
   if (_reconnectAttempts >= MAX_RECONNECT) {
-    addLog('Could not reconnect — opponent may have left', 'log-system');
-    showDisconnectToast();
+    addLog('Could not reconnect after ' + MAX_RECONNECT + ' attempts', 'log-system');
+    showDisconnectToast(true);
     return;
   }
+
   _reconnectAttempts++;
-  const delay = Math.min(1500 * Math.pow(1.6, _reconnectAttempts - 1), 12000);
-  const toast  = document.getElementById('disconnectToast');
-  toast.textContent   = '\u27F3 Reconnecting\u2026 attempt ' + _reconnectAttempts + '/' + MAX_RECONNECT;
+  const delay = Math.min(RECONNECT_BASE_MS * Math.pow(1.5, _reconnectAttempts - 1), 20000);
+  const toast = document.getElementById('disconnectToast');
+  toast.textContent   = '⟳ Reconnecting… ' + _reconnectAttempts + '/' + MAX_RECONNECT;
   toast.style.display = 'block';
-  toast.style.opacity = '';
+  toast.style.opacity = '1';
   toast.style.transition = '';
 
-  _reconnectTimer = setTimeout(() => {
-    if (!peer || peer.destroyed) { showDisconnectToast(); return; }
-
-    if (!isHost && opponentPeerId) {
-      // Non-host knows the host peer ID — reconnect directly
-      try {
-        const conn = peer.connect(opponentPeerId, { reliable: true, serialization: 'json', metadata: { initiator: true } });
-        dc = conn;
-        setupDataChannel(conn);
-        conn.on('error', () => scheduleReconnect());
-      } catch(e) { scheduleReconnect(); }
-    } else if (isHost) {
-      // Host re-arms the incoming connection listener so opponent can reconnect
-      if (peer.removeAllListeners) {
-        peer.removeAllListeners('connection');
-      }
-      peer.on('connection', conn => { dc = conn; setupDataChannel(conn); });
-      toast.textContent = '\u27F3 Waiting for opponent to reconnect\u2026';
-      clearTimeout(_reconnectTimer);
-      _reconnectTimer = setTimeout(() => {
-        if (!dc || !dc.open) scheduleReconnect();
-      }, delay);
-    } else {
-      showDisconnectToast();
-    }
-  }, delay);
+  _reconnectTimer = setTimeout(() => doReconnect(), delay);
 }
 
-function showDisconnectToast() {
+// Arm the host's incoming-connection listener on whatever peer object is current.
+// Safe to call multiple times — always removes old listener first.
+function armHostConnectionListener() {
+  if (!peer || peer.destroyed) return;
+  peer.removeAllListeners('connection');
+  peer.on('connection', conn => {
+    dc = conn;
+    setupDataChannel(conn);
+  });
+}
+
+function doReconnect() {
+  if (!peer || peer.destroyed) {
+    // Peer object is gone — rebuild it with the saved ID and retry
+    const savedId = myPeerId;
+    peer = savedId ? new Peer(savedId, PEER_CONFIG) : new Peer(PEER_CONFIG);
+    peer.on('open', id => {
+      myPeerId = id;
+      if (isHost) {
+        // Re-arm connection listener on the new peer, then wait for guest
+        armHostConnectionListener();
+        const toast = document.getElementById('disconnectToast');
+        toast.textContent = '⟳ Waiting for opponent to reconnect…';
+        // If nobody connects within 50s, nudge the counter and keep waiting
+        clearTimeout(_reconnectTimer);
+        _reconnectTimer = setTimeout(() => {
+          if (!dc || !dc.open) {
+            toast.textContent = '⟳ Still waiting for opponent…';
+            _reconnectTimer = setTimeout(() => {
+              if (!dc || !dc.open) scheduleReconnect();
+            }, 30000);
+          }
+        }, 50000);
+      } else {
+        doReconnect();
+      }
+    });
+    peer.on('error', err => {
+      if (err.type === 'unavailable-id') {
+        // Saved ID still live on relay — get a fresh one
+        try { peer.destroy(); } catch(e) {}
+        const fresh = new Peer(PEER_CONFIG);
+        peer = fresh;
+        fresh.on('open', id => { myPeerId = id; doReconnect(); });
+        fresh.on('error', () => scheduleReconnect());
+        fresh.on('disconnected', () => { if (fresh && !fresh.destroyed) fresh.reconnect(); });
+        if (isHost) armHostConnectionListener();
+        return;
+      }
+      scheduleReconnect();
+    });
+    peer.on('disconnected', () => {
+      if (peer && !peer.destroyed) {
+        peer.reconnect();
+        // Re-arm after reconnect so incoming connections aren't missed
+        if (isHost) {
+          peer.once('open', () => armHostConnectionListener());
+        }
+      }
+    });
+    return;
+  }
+
+  // Ensure we're connected to the signaling server
+  if (!peer.open) {
+    try { peer.reconnect(); } catch(e) {}
+    // Wait for signaling to come back, then retry
+    const onSigOpen = () => {
+      peer.off('open', onSigOpen);
+      if (isHost) armHostConnectionListener();
+      doReconnect();
+    };
+    peer.on('open', onSigOpen);
+    // Safety timeout in case signaling never comes back
+    setTimeout(() => { peer.off('open', onSigOpen); scheduleReconnect(); }, 8000);
+    return;
+  }
+
+  if (!isHost && opponentPeerId) {
+    // Guest: connect directly to host's stable peer ID
+    const toast = document.getElementById('disconnectToast');
+    toast.textContent = '⟳ Connecting to room…';
+    try {
+      const conn = peer.connect(opponentPeerId, {
+        reliable: true, serialization: 'json',
+        metadata: { reconnect: true }, ordered: true,
+        config: PEER_CONFIG.config
+      });
+      dc = conn;
+      setupDataChannel(conn);
+      // If open doesn't fire within 10s, retry
+      const t = setTimeout(() => {
+        if (!conn.open) { triggerReconnect('connect timeout'); }
+      }, 10000);
+      conn.on('open', () => clearTimeout(t));
+    } catch(e) { scheduleReconnect(); }
+
+  } else if (isHost) {
+    // Host: just wait — guest will reconnect to our stable peer ID.
+    // Re-arm the connection listener; don't burn reconnect attempts while waiting.
+    armHostConnectionListener();
+    const toast = document.getElementById('disconnectToast');
+    toast.textContent = '⟳ Waiting for opponent to reconnect…';
+    // If nobody connects within 50s, nudge the message and keep waiting
+    // (don't call scheduleReconnect here — that would eventually give up)
+    clearTimeout(_reconnectTimer);
+    _reconnectTimer = setTimeout(() => {
+      if (!dc || !dc.open) {
+        toast.textContent = '⟳ Still waiting for opponent…';
+        _reconnectTimer = setTimeout(() => {
+          if (!dc || !dc.open) {
+            // Only now count it as a failed attempt
+            scheduleReconnect();
+          }
+        }, 30000);
+      }
+    }, 50000);
+  } else {
+    showDisconnectToast(true);
+  }
+}
+
+function showDisconnectToast(permanent) {
   const toast = document.getElementById('disconnectToast');
+  toast.textContent = '⚠ Could not reconnect — reload to try again';
   toast.style.display = 'block';
-  setTimeout(() => {
-    toast.style.opacity = '0';
-    toast.style.transition = 'opacity 0.5s';
-    setTimeout(() => { toast.style.display = 'none'; toast.style.opacity = ''; toast.style.transition = ''; }, 500);
-  }, 4000);
+  toast.style.opacity = '1';
+  toast.style.transition = '';
+  if (!permanent) {
+    setTimeout(() => {
+      toast.style.opacity = '0';
+      toast.style.transition = 'opacity 0.5s';
+      setTimeout(() => { toast.style.display = 'none'; toast.style.opacity = ''; toast.style.transition = ''; }, 500);
+    }, 4000);
+  }
 }
 
 function send(msg) {
@@ -1080,10 +1461,17 @@ function onConnected() {
   document.getElementById('dealBtn').disabled = !isHost;
   addLog('Connected to ' + opponentNameStr, 'log-system');
 
+  // Restore stakes display now that myPeerId is set
+  if (allStakes.length) renderStakes();
+  // Restore chip display
+  renderTable();
+
   // Init encryption and broadcast our profile (no _sentPubkey guard — always send on connect)
   initEncryption().then(() => {
     broadcastProfile();
   });
+
+  saveDebounced(); // persist session identifiers
 }
 
 function handleMessage(msg) {
@@ -1160,7 +1548,12 @@ document.addEventListener('click', function(e) {
 }, true);
 
 function showOverlay() {
-  if (peer) { peer.destroy(); peer = null; dc = null; }
+  if (peer) { try { peer.destroy(); } catch(e){} peer = null; dc = null; }
+  _isConnected = false;
+  clearTimeout(_reconnectTimer);
+  clearTimeout(_iceDisconnectTimer);
+  clearTimeout(_triggerTimer);
+  _reconnectAttempts = 0;
   document.getElementById('overlay').style.display = 'flex';
   document.getElementById('app').style.display = 'none';
   document.getElementById('myTokenDisplay').textContent = 'Click above to get your room code';
@@ -1677,6 +2070,7 @@ function doShowdown() {
     gs.pot = 0; gs.myBet = 0; gs.opponentBet = 0;
     gs.dealerIsMe = !gs.dealerIsMe;
     renderTable();
+    saveDebounced(); // persist chip counts after hand
   }, 600);
 }
 
@@ -1905,6 +2299,7 @@ function finaliseNegotiatedStake(desc, coins, proposerPeerId) {
   renderTable();
   renderStakes();
   addLog('&#10022; Stake agreed: "' + desc + '" — ' + coins + ' chips added to proposer\'s stack', 'log-win');
+  saveDebounced();
 }
 
 function closeNegotiation() {
@@ -2153,6 +2548,7 @@ function buybackMyStake(id) {
   renderStakes();
   send({ type: 'stake_buy', stakeId: id, createdBy: myPeerId || 'me', side: 'mine_buyback' });
   addLog('You bought back "' + stake.description + '" for ' + cost + ' chips', 'log-action');
+  saveDebounced();
 }
 
 function buyOpponentStake(id) {
@@ -2166,6 +2562,7 @@ function buyOpponentStake(id) {
   renderStakes();
   send({ type: 'stake_buy', stakeId: id, createdBy: stake.createdBy, side: 'theirs' });
   addLog('You bought "' + stake.description + '" for ' + cost + ' chips', 'log-action');
+  saveDebounced();
 }
 
 function handleStakeBuy(id, createdBy, side) {
@@ -2184,6 +2581,7 @@ function handleStakeBuy(id, createdBy, side) {
       renderTable();
       renderStakes();
       addLog('Opponent bought your stake "' + stake.description + '" — +' + stake.coins + ' chips', 'log-win');
+      saveDebounced();
     }
   }
 }
@@ -2297,6 +2695,7 @@ async function sendChatMessage() {
 
   input.value = '';
   clearChatMedia();
+  saveDebounced(); // persist text messages
 }
 
 function chatKeydown(e) {
@@ -2315,6 +2714,7 @@ async function receiveChat(msg) {
   if (!msg.hasImage) {
     appendChatBubble({ text, image: null, name: opponentNameStr, avatar: _lastOppAvatar, isMe: false });
     showTableBubble('oppSpeechBubbleZone', text || '', false, false);
+    saveDebounced();
   } else {
     const mediaType = msg.mediaType || 'image';
     const tableLabel = mediaType === 'video' ? '🎬 Video' : (mediaType === 'gif' ? '🎞 GIF' : '📷 Image');
@@ -2612,6 +3012,7 @@ function handleAvatarUpload(e) {
   resizeImage(file, 200, 200, 0.8, dataUrl => {
     setMyAvatarEverywhere(dataUrl);
     broadcastProfile();
+    saveDebounced();
   });
 }
 
@@ -2653,8 +3054,11 @@ async function inflateData(str) {
 
 // ─── Re-encode video to WebM via MediaRecorder (drops audio, reduces size) ───
 async function compressVideoForTransfer(file, onProgress) {
+  const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
   const supportsWebM = window.MediaRecorder &&
     (MediaRecorder.isTypeSupported('video/webm;codecs=vp8') ||
+     MediaRecorder.isTypeSupported('video/webm;codecs=vp9') ||
      MediaRecorder.isTypeSupported('video/webm'));
 
   const rawRead = () => new Promise((res, rej) => {
@@ -2664,39 +3068,70 @@ async function compressVideoForTransfer(file, onProgress) {
     r.readAsDataURL(file);
   });
 
-  if (!supportsWebM) return rawRead();
+  // On mobile: skip recompression if MediaRecorder / captureStream unavailable
+  // (iOS Safari doesn't support captureStream at all)
+  const testCanvas = document.createElement('canvas');
+  const hasCaptureStream = typeof testCanvas.captureStream === 'function' ||
+                           typeof testCanvas.mozCaptureStream === 'function';
+
+  if (!supportsWebM || !hasCaptureStream) return rawRead();
 
   return new Promise((resolve) => {
     const video = document.createElement('video');
     const objUrl = URL.createObjectURL(file);
-    video.src = objUrl; video.muted = true; video.playsInline = true;
+    video.src = objUrl;
+    video.muted = true;
+    video.playsInline = true;
+    video.crossOrigin = 'anonymous';
 
-    const cleanup = () => URL.revokeObjectURL(objUrl);
+    const cleanup = () => { try { URL.revokeObjectURL(objUrl); } catch(e){} };
     const fallback = () => { cleanup(); rawRead().then(resolve); };
 
-    const timeout = setTimeout(fallback, 45000);
+    // Longer timeout on mobile — decoding is slower
+    const timeout = setTimeout(fallback, isMobile ? 90000 : 45000);
 
     video.onloadedmetadata = () => {
-      const maxW = 640;
-      let w = video.videoWidth || 640, h = video.videoHeight || 360;
+      // Resolution: smaller on mobile to stay within memory/encoder limits
+      const maxW = isMobile ? 480 : 640;
+      const maxH = isMobile ? 360 : 480;
+      let w = video.videoWidth || maxW, h = video.videoHeight || maxH;
       if (w > maxW) { h = Math.round(h * maxW / w); w = maxW; }
+      if (h > maxH) { w = Math.round(w * maxH / h); h = maxH; }
+      // Ensure even dimensions (required by many encoders)
+      w = w % 2 === 0 ? w : w - 1;
+      h = h % 2 === 0 ? h : h - 1;
 
       const canvas = document.createElement('canvas');
       canvas.width = w; canvas.height = h;
       const ctx = canvas.getContext('2d');
-      const stream = canvas.captureStream(24);
 
-      const mime = MediaRecorder.isTypeSupported('video/webm;codecs=vp8')
-        ? 'video/webm;codecs=vp8' : 'video/webm';
+      let stream;
+      try {
+        stream = canvas.captureStream
+          ? canvas.captureStream(isMobile ? 15 : 24)
+          : canvas.mozCaptureStream(isMobile ? 15 : 24);
+      } catch(e) { clearTimeout(timeout); fallback(); return; }
+
+      // Prefer VP9 on desktop (better quality/size), VP8 more compatible on mobile
+      const mimePrefs = isMobile
+        ? ['video/webm;codecs=vp8', 'video/webm']
+        : ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+      const mime = mimePrefs.find(m => MediaRecorder.isTypeSupported(m)) || 'video/webm';
+
+      // Bitrate: lower on mobile (saves memory and transfer time)
+      const bitsPerSecond = isMobile ? 400_000 : 800_000;
+
       let recorder;
-      try { recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 900_000 }); }
+      try { recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: bitsPerSecond }); }
       catch(e) { try { recorder = new MediaRecorder(stream); } catch(e2) { clearTimeout(timeout); fallback(); return; } }
 
       const chunks = [];
-      recorder.ondataavailable = ev => { if (ev.data.size > 0) chunks.push(ev.data); };
+      recorder.ondataavailable = ev => { if (ev.data && ev.data.size > 0) chunks.push(ev.data); };
       recorder.onstop = () => {
-        clearTimeout(timeout); cleanup();
-        const blob = new Blob(chunks, { type: 'video/webm' });
+        clearTimeout(timeout);
+        cleanup();
+        if (intervalId) clearInterval(intervalId);
+        const blob = new Blob(chunks, { type: mime.split(';')[0] || 'video/webm' });
         if (blob.size > 0 && blob.size < file.size * 0.98) {
           if (onProgress) onProgress('done', blob.size, file.size);
           const r = new FileReader();
@@ -2706,20 +3141,37 @@ async function compressVideoForTransfer(file, onProgress) {
           rawRead().then(resolve);
         }
       };
-      recorder.onerror = () => { clearTimeout(timeout); fallback(); };
+      recorder.onerror = () => { clearTimeout(timeout); if (intervalId) clearInterval(intervalId); fallback(); };
 
-      let rafId, duration = video.duration || 0;
+      let intervalId = null;
+      const duration = video.duration || 0;
+
+      // Use setInterval for frame drawing — RAF doesn't tick reliably in offscreen contexts on mobile
       const drawFrame = () => {
-        if (video.ended || video.paused) { if (recorder.state === 'recording') recorder.stop(); return; }
-        ctx.drawImage(video, 0, 0, w, h);
-        if (onProgress && duration > 0) onProgress('progress', video.currentTime / duration);
-        rafId = requestAnimationFrame(drawFrame);
+        if (!video.paused && !video.ended) {
+          try { ctx.drawImage(video, 0, 0, w, h); } catch(e) {}
+        }
+        if (onProgress && duration > 0) {
+          onProgress('progress', Math.min(video.currentTime / duration, 0.99));
+        }
       };
-      video.onended = () => { cancelAnimationFrame(rafId); if (recorder.state === 'recording') recorder.stop(); };
 
-      recorder.start(200);
-      video.play().then(drawFrame).catch(() => { clearTimeout(timeout); fallback(); });
+      video.onended = () => {
+        if (intervalId) { clearInterval(intervalId); intervalId = null; }
+        // Draw last frame and stop
+        try { ctx.drawImage(video, 0, 0, w, h); } catch(e) {}
+        setTimeout(() => { if (recorder.state === 'recording') recorder.stop(); }, 200);
+      };
+
+      video.onplay = () => {
+        recorder.start(200);
+        // 30ms interval ≈ ~33fps cap, more than enough, works on mobile
+        intervalId = setInterval(drawFrame, isMobile ? 67 : 42);
+      };
+
+      video.play().catch(() => { clearTimeout(timeout); fallback(); });
     };
+
     video.onerror = () => { clearTimeout(timeout); fallback(); };
   });
 }
@@ -2843,6 +3295,7 @@ function broadcastProfile() {
         index: i, total: totalChunks });
     }
   }
+  saveDebounced();
 }
 
 // Reassemble incoming avatar chunks
@@ -2957,6 +3410,74 @@ function doAIAction(state) {
   gameState.oppActedThisRound = true;
   handleOpponentAction(action, amount);
 }
+
+// ===================================================
+// BOOT — restore saved state on page load
+// ===================================================
+(function bootRestore() {
+  const saved = loadSavedState();
+  if (!saved) return;
+
+  // Always restore identity & settings silently
+  restoreFromSave(saved);
+
+  // If they had an active session, offer to rejoin
+  if (saved.opponentPeerId && saved.myPeerId) {
+    const banner = document.createElement('div');
+    banner.id = 'resumeBanner';
+    banner.style.cssText = [
+      'position:fixed;bottom:0;left:0;right:0;z-index:300',
+      'background:linear-gradient(90deg,#0d2318,#0f2a1c)',
+      'border-top:1px solid var(--gold-dim)',
+      'padding:14px 20px',
+      'display:flex;align-items:center;gap:14px;flex-wrap:wrap',
+      'font-family:"Spectral",serif;font-size:0.85rem;color:var(--cream)',
+      'box-shadow:0 -4px 24px rgba(0,0,0,0.5)'
+    ].join(';');
+
+    const chipText = saved.myChips !== undefined ? ` · ${saved.myChips} chips` : '';
+    const stakeText = saved.allStakes?.length ? ` · ${saved.allStakes.length} stake${saved.allStakes.length !== 1 ? 's' : ''}` : '';
+    const ago = saved.savedAt ? Math.round((Date.now() - saved.savedAt) / 60000) : 0;
+    const agoText = ago < 2 ? 'just now' : ago < 60 ? `${ago}m ago` : `${Math.round(ago/60)}h ago`;
+
+    banner.innerHTML = `
+      <span style="color:var(--gold);font-size:1.1rem">♠</span>
+      <span>Previous session found <span style="color:var(--text-dim);font-size:0.78rem">(${agoText}${chipText}${stakeText})</span></span>
+      <button id="resumeBtn" style="margin-left:auto;background:linear-gradient(135deg,var(--gold-dim),var(--gold));border:none;border-radius:3px;padding:7px 18px;font-family:'Spectral',serif;font-size:0.82rem;font-weight:600;color:#0a1e10;cursor:pointer">
+        ⟳ Reconnect
+      </button>
+      <button id="freshBtn" style="background:transparent;border:1px solid var(--panel-border);border-radius:3px;padding:7px 14px;font-family:'Spectral',serif;font-size:0.78rem;color:var(--text-dim);cursor:pointer">
+        Fresh Start
+      </button>
+    `;
+
+    document.body.appendChild(banner);
+
+    document.getElementById('resumeBtn').onclick = () => {
+      banner.remove();
+      // Pre-fill the peer token so they just click connect
+      const tokenInput = document.getElementById('peerTokenInput');
+      if (tokenInput && saved.opponentPeerId) {
+        tokenInput.value = saved.opponentPeerId;
+        document.getElementById('connectBtn').disabled = false;
+      }
+      // Pre-fill name
+      const nameInput = document.getElementById('playerNameInput');
+      if (nameInput && saved.myName) nameInput.value = saved.myName;
+      addLog('Restoring session — click "Connect & Play" to rejoin', 'log-system');
+    };
+
+    document.getElementById('freshBtn').onclick = () => {
+      if (confirm('Start fresh? Your chips and stakes history will be cleared.')) {
+        clearSavedState();
+        gameState.myChips = 50;
+        allStakes = [];
+        stakeIdCounter = 0;
+        banner.remove();
+      }
+    };
+  }
+})();
 
 </script>
 </body>
