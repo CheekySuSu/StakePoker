@@ -237,6 +237,123 @@ html,body { height:100%; overflow:hidden; background:#060f0a; font-family:'Spect
   border:1px dashed rgba(201,168,76,0.2);
 }
 
+/* ===== CARD DEAL / FLIP ANIMATIONS ===== */
+@keyframes dealFromDeck {
+  0%   { transform: translate(var(--dx), var(--dy)) rotate(var(--dr)) scale(0.6); opacity:0; }
+  55%  { opacity:1; }
+  100% { transform: translate(0,0) rotate(0deg) scale(1); opacity:1; }
+}
+@keyframes cardFlipReveal {
+  0%   { transform: rotateY(90deg) scale(0.88); }
+  100% { transform: rotateY(0deg) scale(1); }
+}
+@keyframes communitySlide {
+  0%   { transform: translate(var(--cdx), var(--cdy)) rotate(var(--cdr)) scale(0.5); opacity:0; }
+  55%  { opacity:1; }
+  85%  { transform: translate(0,0) rotate(0deg) scale(1.07); box-shadow: 0 0 20px rgba(201,168,76,0.6); }
+  100% { transform: translate(0,0) rotate(0deg) scale(1); box-shadow: 2px 4px 12px rgba(0,0,0,0.5); }
+}
+@keyframes deckShuffleAnim {
+  0%,100% { transform: translate(-50%,-50%) rotate(0deg); }
+  20%  { transform: translate(calc(-50% - 5px), -50%) rotate(-3deg); }
+  40%  { transform: translate(calc(-50% + 5px), -50%) rotate(3deg); }
+  60%  { transform: translate(calc(-50% - 3px), -50%) rotate(-2deg); }
+  80%  { transform: translate(calc(-50% + 3px), -50%) rotate(2deg); }
+}
+@keyframes fadeSlideUp {
+  from { opacity:0; transform:translateY(8px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+.card.dealing {
+  animation: dealFromDeck 0.44s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+  animation-delay: var(--deal-delay, 0ms);
+}
+.card.flipping {
+  animation: cardFlipReveal 0.32s cubic-bezier(0.4, 0, 0.2, 1) both;
+  animation-delay: var(--deal-delay, 0ms);
+  perspective: 600px;
+}
+.card.community-dealing {
+  animation: communitySlide 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: var(--deal-delay, 0ms);
+}
+
+/* ── Check action animation ── */
+@keyframes checkKnock {
+  0%   { transform: translateY(0)    rotate(0deg);  }
+  18%  { transform: translateY(-9px) rotate(-4deg); }
+  36%  { transform: translateY(0)    rotate(0deg);  }
+  52%  { transform: translateY(-5px) rotate(3deg);  }
+  68%  { transform: translateY(0)    rotate(0deg);  }
+  84%  { transform: translateY(-2px) rotate(-1deg); }
+  100% { transform: translateY(0)    rotate(0deg);  }
+}
+@keyframes checkRipple {
+  0%   { transform: scale(0.6); opacity: 0.8; }
+  100% { transform: scale(2.6); opacity: 0;   }
+}
+@keyframes checkBadgePop {
+  0%   { transform: scale(0) translateY(6px);    opacity:0; }
+  55%  { transform: scale(1.15) translateY(-2px); opacity:1; }
+  100% { transform: scale(1) translateY(0);       opacity:1; }
+}
+@keyframes checkBadgeFade {
+  0%   { opacity:1; transform: translateY(0);    }
+  100% { opacity:0; transform: translateY(-14px); }
+}
+.card.checking {
+  animation: checkKnock 0.55s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+.check-ripple {
+  position: absolute;
+  width: 54px; height: 76px;
+  border-radius: 6px;
+  border: 2px solid rgba(39,174,96,0.7);
+  pointer-events: none;
+  animation: checkRipple 0.6s ease-out forwards;
+}
+.check-badge {
+  position: absolute;
+  background: rgba(39,174,96,0.92);
+  color: #fff;
+  font-family: 'Playfair Display', serif;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  padding: 3px 10px;
+  border-radius: 20px;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 10;
+  box-shadow: 0 2px 12px rgba(39,174,96,0.4);
+}
+.check-badge.popping  { animation: checkBadgePop  0.3s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+.check-badge.fading   { animation: checkBadgeFade 0.4s ease-in forwards; }
+
+/* Floating deck pile rendered in the centre of the table */
+#deckPile {
+  position:absolute; left:50%; top:50%;
+  transform:translate(-50%,-50%);
+  width:54px; height:76px; z-index:4;
+  pointer-events:none; transition:opacity 0.3s;
+}
+#deckPile.hidden { opacity:0; pointer-events:none; }
+#deckPile.shuffling { animation: deckShuffleAnim 0.3s ease-in-out 3; }
+.deck-layer {
+  position:absolute; inset:0; border-radius:6px;
+  background:linear-gradient(135deg,#1a3a6b 25%,#0d2040 25%,#0d2040 50%,#1a3a6b 50%,#1a3a6b 75%,#0d2040 75%);
+  background-size:12px 12px;
+  border:2px solid #2a4a8b;
+  box-shadow:0 2px 8px rgba(0,0,0,0.7);
+}
+.deck-layer::after {
+  content:''; position:absolute; inset:4px;
+  border:1px solid rgba(100,150,255,0.25); border-radius:3px;
+}
+.deck-layer:nth-child(1) { transform:translate(2px,2px); }
+.deck-layer:nth-child(2) { transform:translate(1px,1px); }
+.deck-layer:nth-child(3) { transform:translate(0,0); }
+
 /* Community cards */
 #communityArea {
   display:flex; flex-direction:column; align-items:center; gap:10px; z-index:1;
@@ -594,6 +711,12 @@ html,body { height:100%; overflow:hidden; background:#060f0a; font-family:'Spect
   <div id="main">
     <!-- POKER TABLE -->
     <div id="tableArea">
+      <!-- Floating deck pile (animated away when dealing) -->
+      <div id="deckPile" class="hidden">
+        <div class="deck-layer"></div>
+        <div class="deck-layer"></div>
+        <div class="deck-layer"></div>
+      </div>
       <!-- Opponent -->
       <div class="player-zone" id="opponentZone" style="position:relative">
         <div class="player-info">
@@ -959,20 +1082,9 @@ function restoreFromSave(data) {
     if (inp) inp.value = data.customModel;
   }
 
-  // Restore chips — only if we are restoring an active in-session state
-  // (onConnected() resets these for new sessions; only apply here if returning to existing session)
-  // We tag the save with a flag when a real session was active.
-  if (typeof data.myChips === 'number' && data.sessionActive) {
-    gameState.myChips = data.myChips;
-  }
-
-  // Restore stakes — same guard: only if flagged as an active session save
-  if (Array.isArray(data.allStakes) && data.sessionActive) {
-    allStakes = data.allStakes;
-  }
-  if (typeof data.stakeIdCounter === 'number' && data.sessionActive) {
-    stakeIdCounter = data.stakeIdCounter;
-  }
+  // Chips and stakes are restored in onConnected() which can distinguish
+  // a fresh connection from a reconnect. We intentionally skip restoring them
+  // here so nothing leaks into a new session before the peer connects.
 
   // Restore session identifiers for reconnect
   if (data.opponentPeerId) opponentPeerId = data.opponentPeerId;
@@ -1464,25 +1576,45 @@ function onConnected() {
   document.getElementById('dealBtn').disabled = !isHost;
   addLog('Connected to ' + opponentNameStr, 'log-system');
 
-  // Clear stale session data (chips, stakes, game state) so each new connection starts fresh.
-  // Identity & settings are preserved. Chat/log history is kept for context.
-  gameState.myChips = 50;
-  gameState.opponentChips = 50;
-  allStakes = [];
-  stakeIdCounter = 0;
-  resetGame();
+  // Determine whether this is a brand-new session or a reconnect to an existing one.
+  // A reconnect means the opponentPeerId we're connecting to matches the one already
+  // stored in the saved state (i.e. the user clicked "Reconnect" from the resume banner).
+  const saved = loadSavedState();
+  const isReconnect = !!(
+    saved &&
+    saved.sessionActive &&
+    saved.opponentPeerId &&
+    opponentPeerId &&
+    saved.opponentPeerId === opponentPeerId
+  );
 
-  // Restore stakes display now that myPeerId is set
+  if (isReconnect) {
+    // Restore chips and stakes from the previous session
+    if (typeof saved.myChips === 'number') gameState.myChips = saved.myChips;
+    if (Array.isArray(saved.allStakes))    allStakes        = saved.allStakes;
+    if (typeof saved.stakeIdCounter === 'number') stakeIdCounter = saved.stakeIdCounter;
+    addLog('Session restored — chips and stakes carried over', 'log-system');
+  } else {
+    // Fresh connection: wipe game economy so nothing bleeds across sessions
+    gameState.myChips    = 50;
+    gameState.opponentChips = 50;
+    allStakes            = [];
+    stakeIdCounter       = 0;
+    resetGame();
+  }
+
+  // Refresh UI
   if (allStakes.length) renderStakes();
-  // Restore chip display
+  else {
+    document.getElementById('myStakesList').innerHTML   = '<div class="empty-state">No stakes committed yet</div>';
+    document.getElementById('theirStakesList').innerHTML = '<div class="empty-state">No opponent stakes available</div>';
+  }
   renderTable();
 
-  // Init encryption and broadcast our profile (no _sentPubkey guard — always send on connect)
-  initEncryption().then(() => {
-    broadcastProfile();
-  });
+  // Init encryption and broadcast our profile
+  initEncryption().then(() => { broadcastProfile(); });
 
-  saveDebounced(); // persist session identifiers
+  saveDebounced();
 }
 
 function handleMessage(msg) {
@@ -1718,6 +1850,8 @@ function startNewHand() {
   applyGameState(state, false);
   send({ type: 'game_state', state });
   addLog('New hand dealt', 'log-system');
+  // Animate the deal for the host side
+  animateDeal(gameState);
 }
 
 function applyGameState(state, fromNetwork) {
@@ -1743,6 +1877,27 @@ function applyGameState(state, fromNetwork) {
 
   renderTable();
 
+  // ── Trigger animations ────────────────────────────────────────────────────
+  if (fromNetwork && state.phase === 'pre_flop' && prevPhase !== 'pre_flop') {
+    // New hand received from network — animate the deal for the guest side
+    animateDeal(gameState);
+  } else if (
+    fromNetwork &&
+    ['flop','turn','river'].includes(state.phase) &&
+    state.phase !== prevPhase
+  ) {
+    // Community card phase transition — animate new cards
+    animateCommunityCards(gameState, prevPhase);
+  } else if (
+    !fromNetwork &&
+    ['flop','turn','river'].includes(state.phase) &&
+    state.phase !== prevPhase
+  ) {
+    // Local phase advance (host-side) — animate community cards too
+    animateCommunityCards(gameState, prevPhase);
+  }
+  // ─────────────────────────────────────────────────────────────────────────
+
   // Only run showdown logic if received from network (not triggered locally)
   if (state.phase === 'showdown' && fromNetwork) {
     doShowdown();
@@ -1760,51 +1915,35 @@ function applyGameState(state, fromNetwork) {
 
 function renderTable() {
   const gs = gameState;
-  // Phase
-  const phaseNames = { pre_flop:'Pre-Flop', flop:'Flop', turn:'Turn', river:'River', showdown:'Showdown', waiting:'Waiting' };
-  document.getElementById('phaseLabel').textContent = phaseNames[gs.phase] || gs.phase;
+  _renderTableMeta(gs);
 
-  // Pot
-  document.getElementById('potValue').textContent = gs.pot;
-  document.getElementById('myBetValue').textContent = gs.myBet;
-  document.getElementById('oppBetValue').textContent = gs.opponentBet;
-
-  // Chips
-  document.getElementById('playerChips').textContent = gs.myChips;
-  document.getElementById('opponentChips').textContent = gs.opponentChips;
-
-  // Community cards
+  // Community cards (no animation — live sync render)
   const cc = document.getElementById('communityCards');
-  cc.innerHTML = '';
-  const showCount = { waiting:0, pre_flop:0, flop:3, turn:4, river:5, showdown:5 }[gs.phase] || 0;
-  for (let i = 0; i < 5; i++) {
-    if (i < showCount && gs.community && gs.community[i]) cc.appendChild(makeCard(gs.community[i], true));
-    else { const ph = document.createElement('div'); ph.className='card-placeholder'; cc.appendChild(ph); }
+  // Only update if we're not mid-deal animation
+  if (!_dealAnimActive) {
+    cc.innerHTML = '';
+    const showCount = { waiting:0, pre_flop:0, flop:3, turn:4, river:5, showdown:5 }[gs.phase] || 0;
+    for (let i = 0; i < 5; i++) {
+      if (i < showCount && gs.community && gs.community[i]) cc.appendChild(makeCard(gs.community[i], true));
+      else { const ph = document.createElement('div'); ph.className='card-placeholder'; cc.appendChild(ph); }
+    }
+
+    // Player cards
+    const pc2 = document.getElementById('playerCards');
+    pc2.innerHTML = '';
+    if (gs.myCards && gs.myCards.length) gs.myCards.forEach(c => pc2.appendChild(makeCard(c, true)));
+    else for(let i=0;i<2;i++){const ph=document.createElement('div');ph.className='card-placeholder';pc2.appendChild(ph);}
+
+    // Opponent cards
+    const oc = document.getElementById('opponentCards');
+    oc.innerHTML = '';
+    if (gs.opponentCards && gs.opponentCards.length) {
+      gs.opponentCards.forEach(c => oc.appendChild(makeCard(c, gs.phase === 'showdown')));
+    } else for(let i=0;i<2;i++){const ph=document.createElement('div');ph.className='card-placeholder';oc.appendChild(ph);}
   }
-
-  // Player cards
-  const pc2 = document.getElementById('playerCards');
-  pc2.innerHTML = '';
-  if (gs.myCards && gs.myCards.length) gs.myCards.forEach(c => pc2.appendChild(makeCard(c, true)));
-  else for(let i=0;i<2;i++){const ph=document.createElement('div');ph.className='card-placeholder';pc2.appendChild(ph);}
-
-  // Opponent cards
-  const oc = document.getElementById('opponentCards');
-  oc.innerHTML = '';
-  if (gs.opponentCards && gs.opponentCards.length) {
-    gs.opponentCards.forEach(c => oc.appendChild(makeCard(c, gs.phase === 'showdown')));
-  } else for(let i=0;i<2;i++){const ph=document.createElement('div');ph.className='card-placeholder';oc.appendChild(ph);}
-
-  // Bet badges
-  const mb = document.getElementById('playerBetBadge');
-  const ob = document.getElementById('opponentBetBadge');
-  if (gs.myBet > 0) { mb.style.display='block'; mb.textContent='Bet: '+gs.myBet; }
-  else mb.style.display='none';
-  if (gs.opponentBet > 0) { ob.style.display='block'; ob.textContent='Bet: '+gs.opponentBet; }
-  else ob.style.display='none';
 }
 
-function makeCard(card, faceUp) {
+function makeCard(card, faceUp, animClass, delayMs, dx, dy, dr) {
   const el = document.createElement('div');
   el.className = 'card ' + (faceUp ? SUIT_CLASSES[card.s] : 'back');
   if (faceUp) {
@@ -1814,7 +1953,234 @@ function makeCard(card, faceUp) {
     suitEl.textContent = SUITS[card.s];
     el.appendChild(valEl); el.appendChild(suitEl);
   }
+  if (animClass) {
+    // Set CSS custom properties for origin offset
+    if (dx !== undefined) el.style.setProperty('--dx', dx + 'px');
+    if (dy !== undefined) el.style.setProperty('--dy', dy + 'px');
+    if (dr !== undefined) el.style.setProperty('--dr', dr + 'deg');
+    if (dx !== undefined) el.style.setProperty('--cdx', dx + 'px');
+    if (dy !== undefined) el.style.setProperty('--cdy', dy + 'px');
+    if (dr !== undefined) el.style.setProperty('--cdr', dr + 'deg');
+    el.style.setProperty('--deal-delay', (delayMs || 0) + 'ms');
+    el.classList.add(animClass);
+  }
   return el;
+}
+
+// ── Animation helpers ────────────────────────────────────────────────────────
+
+// Compute offset from the deck-pile centre to a target element's centre
+function deckOffsetTo(targetEl) {
+  const deck = document.getElementById('deckPile');
+  if (!deck || !targetEl) return { dx:0, dy:0 };
+  const dr = deck.getBoundingClientRect();
+  const tr = targetEl.getBoundingClientRect();
+  const deckCx = dr.left + dr.width  / 2;
+  const deckCy = dr.top  + dr.height / 2;
+  const targCx = tr.left + tr.width  / 2;
+  const targCy = tr.top  + tr.height / 2;
+  return { dx: deckCx - targCx, dy: deckCy - targCy };
+}
+
+let _dealAnimActive = false;
+
+// Full hole-card deal animation (called instead of bare renderTable on new hand)
+function animateDeal(gs) {
+  if (_dealAnimActive) { renderTable(); return; }
+  _dealAnimActive = true;
+
+  // 1. Show & shuffle the deck
+  const deck = document.getElementById('deckPile');
+  deck.classList.remove('hidden');
+  deck.classList.add('shuffling');
+  deck.addEventListener('animationend', () => deck.classList.remove('shuffling'), { once:true });
+
+  // 2. Clear card zones, keep placeholders
+  const pc = document.getElementById('playerCards');
+  const oc = document.getElementById('opponentCards');
+  const cc = document.getElementById('communityCards');
+  pc.innerHTML = ''; oc.innerHTML = ''; cc.innerHTML = '';
+  // Placeholder so layout doesn't collapse while animating
+  for (let i=0;i<2;i++) {
+    const ph1 = document.createElement('div'); ph1.className='card-placeholder'; pc.appendChild(ph1);
+    const ph2 = document.createElement('div'); ph2.className='card-placeholder'; oc.appendChild(ph2);
+  }
+  for (let i=0;i<5;i++) {
+    const ph = document.createElement('div'); ph.className='card-placeholder'; cc.appendChild(ph);
+  }
+
+  // Update non-card UI immediately
+  _renderTableMeta(gs);
+
+  // Deal sequence: opp[0] → my[0] → opp[1] → my[1]  (classic deal order)
+  const dealOrder = [
+    { zone:'opp', idx:0, delay:200  },
+    { zone:'my',  idx:0, delay:400  },
+    { zone:'opp', idx:1, delay:600  },
+    { zone:'my',  idx:1, delay:800  },
+  ];
+
+  dealOrder.forEach(({ zone, idx, delay }) => {
+    setTimeout(() => {
+      const container = zone === 'my' ? pc : oc;
+      const card      = zone === 'my' ? gs.myCards[idx] : gs.opponentCards[idx];
+      const faceUp    = zone === 'my'; // opp cards dealt face-down
+      const ph = container.children[idx];
+
+      // Compute offset from deck to placeholder position
+      const { dx, dy } = deckOffsetTo(ph);
+      const dr = (Math.random() - 0.5) * 18; // slight random rotation at origin
+
+      const cardEl = makeCard(card, faceUp, 'dealing', 0, dx, dy, dr);
+      container.replaceChild(cardEl, ph);
+
+      // After deal animation, if it's an opponent card being revealed at showdown we flip
+      // (handled separately in doShowdown). For now just remove the animation class.
+      cardEl.addEventListener('animationend', () => {
+        cardEl.classList.remove('dealing');
+      }, { once:true });
+    }, delay);
+  });
+
+  // After all 4 cards dealt, hide deck
+  setTimeout(() => {
+    deck.classList.add('hidden');
+    _dealAnimActive = false;
+  }, 1050);
+}
+
+// Community card reveal animation for flop/turn/river
+function animateCommunityCards(gs, prevPhase) {
+  const showCount = { flop:3, turn:4, river:5, showdown:5 }[gs.phase] || 0;
+  const prevCount = { waiting:0, pre_flop:0, flop:3, turn:4, river:5 }[prevPhase] || 0;
+  if (showCount <= prevCount) return; // nothing new to animate
+
+  const cc = document.getElementById('communityCards');
+
+  // Re-render all placeholders/existing cards first
+  cc.innerHTML = '';
+  for (let i = 0; i < 5; i++) {
+    if (i < prevCount && gs.community && gs.community[i]) {
+      cc.appendChild(makeCard(gs.community[i], true)); // already-shown, no anim
+    } else {
+      const ph = document.createElement('div'); ph.className='card-placeholder'; cc.appendChild(ph);
+    }
+  }
+
+  // Show deck briefly
+  const deck = document.getElementById('deckPile');
+  deck.classList.remove('hidden');
+
+  // Animate only new cards
+  const newCount = showCount - prevCount;
+  for (let i = prevCount; i < showCount; i++) {
+    const localI = i; // capture
+    const delay  = (i - prevCount) * 160;
+    setTimeout(() => {
+      const ph = cc.children[localI];
+      if (!ph) return;
+      const { dx, dy } = deckOffsetTo(ph);
+      const dr = (Math.random() - 0.5) * 22;
+      const cardEl = makeCard(gs.community[localI], true, 'community-dealing', 0, dx, dy, dr);
+      cc.replaceChild(cardEl, ph);
+      cardEl.addEventListener('animationend', () => cardEl.classList.remove('community-dealing'), { once:true });
+    }, delay);
+  }
+
+  setTimeout(() => {
+    deck.classList.add('hidden');
+  }, prevCount === 0 ? 0 : (newCount * 160 + 350));
+}
+
+// Flip opponent cards face-up at showdown
+function animateOpponentReveal(gs) {
+  const oc = document.getElementById('opponentCards');
+  if (!oc || !gs.opponentCards) return;
+  gs.opponentCards.forEach((card, i) => {
+    const existing = oc.children[i];
+    if (!existing) return;
+    setTimeout(() => {
+      const cardEl = makeCard(card, true, 'flipping', 0);
+      oc.replaceChild(cardEl, existing);
+      cardEl.addEventListener('animationend', () => cardEl.classList.remove('flipping'), { once:true });
+    }, i * 200);
+  });
+}
+
+// Check action — cards knock + ripple + floating "Check" badge
+function animateCheck(isMine) {
+  const zone    = isMine ? document.getElementById('playerZone')
+                         : document.getElementById('opponentZone');
+  const cards   = isMine ? document.getElementById('playerCards')
+                         : document.getElementById('opponentCards');
+  if (!zone || !cards) return;
+
+  // Knock all cards in the hand
+  Array.from(cards.children).forEach((card, i) => {
+    if (!card.classList.contains('card')) return;
+    card.classList.remove('checking');
+    // Force reflow so re-adding works
+    void card.offsetWidth;
+    card.style.animationDelay = (i * 60) + 'ms';
+    card.classList.add('checking');
+    card.addEventListener('animationend', () => {
+      card.classList.remove('checking');
+      card.style.animationDelay = '';
+    }, { once: true });
+
+    // Ripple on each card
+    const ripple = document.createElement('div');
+    ripple.className = 'check-ripple';
+    // Position ripple over this card
+    const cardRect  = card.getBoundingClientRect();
+    const zoneRect  = zone.getBoundingClientRect();
+    ripple.style.cssText = [
+      'left:'   + (cardRect.left - zoneRect.left) + 'px',
+      'top:'    + (cardRect.top  - zoneRect.top)  + 'px',
+      'animation-delay:' + (i * 60) + 'ms'
+    ].join(';');
+    zone.appendChild(ripple);
+    ripple.addEventListener('animationend', () => ripple.remove(), { once:true });
+  });
+
+  // Floating "Check ✓" badge above the hand zone
+  const badge = document.createElement('div');
+  badge.className = 'check-badge popping';
+  badge.textContent = '✓ Check';
+
+  // Centre badge horizontally over the cards container
+  const cardsRect = cards.getBoundingClientRect();
+  const zoneRect2 = zone.getBoundingClientRect();
+  badge.style.cssText = [
+    'left:'    + (cardsRect.left - zoneRect2.left + cardsRect.width / 2) + 'px',
+    'top:'     + (cardsRect.top  - zoneRect2.top  - 28) + 'px',
+    'transform-origin: center bottom'
+  ].join(';');
+  // Translate to centre
+  badge.style.transform = 'translateX(-50%)';
+  zone.appendChild(badge);
+
+  // Swap to fade-out after 900 ms
+  setTimeout(() => {
+    badge.classList.remove('popping');
+    badge.classList.add('fading');
+    badge.addEventListener('animationend', () => badge.remove(), { once:true });
+  }, 900);
+}
+
+// Render everything except cards (used during anim so UI stays in sync)
+function _renderTableMeta(gs) {
+  const phaseNames = { pre_flop:'Pre-Flop', flop:'Flop', turn:'Turn', river:'River', showdown:'Showdown', waiting:'Waiting' };
+  document.getElementById('phaseLabel').textContent = phaseNames[gs.phase] || gs.phase;
+  document.getElementById('potValue').textContent = gs.pot;
+  document.getElementById('myBetValue').textContent = gs.myBet;
+  document.getElementById('oppBetValue').textContent = gs.opponentBet;
+  document.getElementById('playerChips').textContent = gs.myChips;
+  document.getElementById('opponentChips').textContent = gs.opponentChips;
+  const mb = document.getElementById('playerBetBadge');
+  const ob = document.getElementById('opponentBetBadge');
+  if (gs.myBet > 0) { mb.style.display='block'; mb.textContent='Bet: '+gs.myBet; } else mb.style.display='none';
+  if (gs.opponentBet > 0) { ob.style.display='block'; ob.textContent='Bet: '+gs.opponentBet; } else ob.style.display='none';
 }
 
 function enableActions() {
@@ -1908,6 +2274,7 @@ function processAction(action, amount, isMine) {
 
   if (action === 'check') {
     addLog((isMine ? 'You' : opponentNameStr) + ' checked', 'log-action');
+    animateCheck(isMine);
     if (isMine) gs.myActedThisRound = true;
     else gs.oppActedThisRound = true;
     advanceOrSwitch(isMine);
@@ -2053,6 +2420,9 @@ function doShowdown() {
   const gs = gameState;
   gs.phase = 'showdown';
   renderTable();
+
+  // Flip opponent's cards face-up with animation
+  animateOpponentReveal(gs);
 
   const allMy = [...gs.myCards, ...(gs.community||[])];
   const allOp = [...gs.opponentCards, ...(gs.community||[])];
