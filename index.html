@@ -1575,7 +1575,6 @@ function onConnected() {
 
   document.getElementById('dealBtn').disabled = !isHost;
   addLog('Connected to ' + opponentNameStr, 'log-system');
-
   // Determine whether this is a brand-new session or a reconnect to an existing one.
   // A reconnect means the opponentPeerId we're connecting to matches the one already
   // stored in the saved state (i.e. the user clicked "Reconnect" from the resume banner).
@@ -1601,6 +1600,7 @@ function onConnected() {
     allStakes            = [];
     stakeIdCounter       = 0;
     resetGame();
+    clearSavedState(); // ensure no stale session lingers for next boot
   }
 
   // Refresh UI
@@ -1610,6 +1610,13 @@ function onConnected() {
     document.getElementById('theirStakesList').innerHTML = '<div class="empty-state">No opponent stakes available</div>';
   }
   renderTable();
+
+  // Wager gate: disable deal button until a stake is agreed
+  // (Solo/AI mode bypasses this gate so the demo works immediately)
+  if (!window._soloMode && (!allStakes || allStakes.length === 0)) {
+    document.getElementById('dealBtn').disabled = true;
+    setMessage('⚠ Agree on a wager first — add a stake to start playing');
+  }
 
   // Init encryption and broadcast our profile
   initEncryption().then(() => { broadcastProfile(); });
@@ -1804,6 +1811,14 @@ function shuffle(deck) {
 }
 
 function requestDeal() {
+  // Require at least one agreed stake before any hand can be dealt
+  // (Skip this gate in solo/AI mode so the demo remains playable)
+  if (!window._soloMode && (!allStakes || allStakes.length === 0)) {
+    setMessage('⚠ Agree on a wager first — add a stake before dealing');
+    addLog('⚠ A wager must be agreed before dealing', 'log-system');
+    switchTab('stakes');
+    return;
+  }
   if (isHost) {
     startNewHand();
   } else {
@@ -1821,17 +1836,24 @@ function startNewHand() {
   document.getElementById('dealBtn').style.display = 'none';
   const deck = shuffle(createDeck());
 
+  const mySB  = gameState.dealerIsMe ? gameState.smallBlind : gameState.bigBlind;
+  const myBB  = gameState.dealerIsMe ? gameState.bigBlind  : gameState.smallBlind;
+  const oppSB = gameState.dealerIsMe ? gameState.bigBlind  : gameState.smallBlind;
+  const oppBB = gameState.dealerIsMe ? gameState.smallBlind: gameState.bigBlind;
+  const myBlind  = Math.min(mySB,  gameState.myChips);
+  const oppBlind = Math.min(oppSB, gameState.opponentChips);
+
   const state = {
     phase: 'pre_flop',
     deck: deck,
     myCards: [deck[0], deck[2]],
     opponentCards: [deck[1], deck[3]],
     community: [],
-    pot: gameState.bigBlind + gameState.smallBlind,
-    myBet: gameState.dealerIsMe ? gameState.smallBlind : gameState.bigBlind,
-    opponentBet: gameState.dealerIsMe ? gameState.bigBlind : gameState.smallBlind,
-    myChips: gameState.myChips - (gameState.dealerIsMe ? gameState.smallBlind : gameState.bigBlind),
-    opponentChips: gameState.opponentChips - (gameState.dealerIsMe ? gameState.bigBlind : gameState.smallBlind),
+    pot: myBlind + oppBlind,
+    myBet: myBlind,
+    opponentBet: oppBlind,
+    myChips: Math.max(0, gameState.myChips - myBlind),
+    opponentChips: Math.max(0, gameState.opponentChips - oppBlind),
     myTurn: gameState.dealerIsMe, // small blind acts first post-flop, big blind first pre
     dealerIsMe: gameState.dealerIsMe,
     smallBlind: gameState.smallBlind,
@@ -2281,9 +2303,9 @@ function processAction(action, amount, isMine) {
   }
 
   if (action === 'call') {
-    const callAmt = isMine ? (gs.opponentBet - gs.myBet) : (gs.myBet - gs.opponentBet);
-    if (isMine) { gs.myBet += callAmt; gs.myChips -= callAmt; gs.myActedThisRound = true; }
-    else { gs.opponentBet += callAmt; gs.opponentChips -= callAmt; gs.oppActedThisRound = true; }
+    let callAmt = isMine ? (gs.opponentBet - gs.myBet) : (gs.myBet - gs.opponentBet);
+    if (isMine) { callAmt = Math.min(callAmt, gs.myChips); gs.myBet += callAmt; gs.myChips = Math.max(0, gs.myChips - callAmt); gs.myActedThisRound = true; }
+    else { callAmt = Math.min(callAmt, gs.opponentChips); gs.opponentBet += callAmt; gs.opponentChips = Math.max(0, gs.opponentChips - callAmt); gs.oppActedThisRound = true; }
     gs.pot += callAmt;
     addLog((isMine ? 'You' : opponentNameStr) + ' called ' + callAmt, 'log-action');
     advanceOrSwitch(isMine);
@@ -2291,16 +2313,16 @@ function processAction(action, amount, isMine) {
 
   if (action === 'raise') {
     if (isMine) {
-      const total = amount;
-      const extra = total - gs.myBet;
-      gs.myBet = total; gs.myChips -= extra; gs.pot += extra;
-      gs.lastRaise = total;
+      const total = Math.min(amount, gs.myBet + gs.myChips); // can't raise beyond what we have
+      const extra = Math.min(total - gs.myBet, gs.myChips);
+      gs.myBet = gs.myBet + extra; gs.myChips = Math.max(0, gs.myChips - extra); gs.pot += extra;
+      gs.lastRaise = gs.myBet;
       gs.myActedThisRound = true; gs.oppActedThisRound = false; // opponent must respond
     } else {
-      const total = amount;
-      const extra = total - gs.opponentBet;
-      gs.opponentBet = total; gs.opponentChips -= extra; gs.pot += extra;
-      gs.lastRaise = total;
+      const total = Math.min(amount, gs.opponentBet + gs.opponentChips);
+      const extra = Math.min(total - gs.opponentBet, gs.opponentChips);
+      gs.opponentBet = gs.opponentBet + extra; gs.opponentChips = Math.max(0, gs.opponentChips - extra); gs.pot += extra;
+      gs.lastRaise = gs.opponentBet;
       gs.oppActedThisRound = true; gs.myActedThisRound = false; // I must respond
     }
     addLog((isMine ? 'You' : opponentNameStr) + ' raised to ' + amount, 'log-action');
@@ -2477,7 +2499,12 @@ function hideResult() {
   btn.textContent = 'Deal Again';
   showDealBtn();
   gameState.phase = 'waiting';
-  setMessage('Ready for next hand');
+  if (!allStakes || allStakes.length === 0) {
+    setMessage('⚠ Agree on a wager before dealing');
+    document.getElementById('dealBtn').disabled = true;
+  } else {
+    setMessage('Ready for next hand');
+  }
 }
 
 function resetGame() {
@@ -2683,6 +2710,11 @@ function finaliseNegotiatedStake(desc, coins, proposerPeerId) {
   renderTable();
   renderStakes();
   addLog('&#10022; Stake agreed: "' + desc + '" — ' + coins + ' chips added to proposer\'s stack', 'log-win');
+  // Unlock dealing now that at least one wager is in place
+  if (isHost && document.getElementById('dealBtn').disabled && gameState.phase === 'waiting') {
+    document.getElementById('dealBtn').disabled = false;
+    setMessage('Wager agreed — ready to deal!');
+  }
   saveDebounced();
 }
 
